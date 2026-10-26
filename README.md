@@ -14,15 +14,15 @@ sleduje, jak to obyvatel **Toník** odnese, a nakonec zapne ochranu a zkusí út
 
 | Oblast | Stav |
 |---|---|
-| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička zatím vektorová |
-| Konfigurátor (bojler, topení, osvětlení + 7 zařízení „již brzy") | ✅ karty i klepnutí přímo do scény, ukládání do localStorage |
+| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička jako živý 3D model s animacemi |
+| Konfigurátor (9 zařízení: bojler, topení, osvětlení, robotický vysavač, televize, hlasový asistent, kamera, pračka, zámek + kávovar a lednice „již brzy") | ✅ karty i klepnutí přímo do scény, ukládání do localStorage |
 | Běžná vs. chytrá varianta zařízení | ✅ chytrá má displej, LED a odznak stavu |
-| Simulované útoky (8 útoků na 3 zařízení) | ✅ |
-| Animovaná postavička s autonomním chováním | ✅ 12 běžných aktivit, 13 výrazů, 12 emoji bublin |
+| Simulované útoky (22 útoků na 9 zařízení) | ✅ živé 3D prvky: jezdící vysavač, otočná kamera, buben pračky, louže, dveře |
+| Animovaná postavička s autonomním chováním | ✅ 3D model se 14 animacemi, 20 aktivit, 13 výrazů, 12 emoji bublin |
 | Hlavní scénář bojler → studená sprcha → radiátor | ✅ výsledek se liší podle stavu topení |
-| Kombinace útoků | ✅ např. tma + zima, studená sprcha potmě, nefunkční topení |
+| Kombinace útoků | ✅ např. tma + zima, studená sprcha potmě, odemčené dveře + vypnutá kamera |
 | Ochranný režim produktu | ✅ obnovení zařízení, štít kolem domu, blokace útoků |
-| Závěrečné vyhodnocení | ✅ statistiky, 11 objevitelných situací, rizika, CTA, sdílení |
+| Závěrečné vyhodnocení | ✅ statistiky, 26 objevitelných situací, rizika, CTA, sdílení |
 | Zvuky + hudba | ✅ syntetizované přes WebAudio (bez souborů), lze vypnout |
 | Mobil | ✅ spodní panel, posun a přiblížení scény prsty |
 | Nasazení | ✅ GitHub Actions → GitHub Pages |
@@ -45,6 +45,21 @@ blender -b --factory-startup --python house.py -- <out_dir> final           # je
 ```
 
 Rozmístění v `house.py` odpovídá mřížce v `src/config/layout.ts` (1 dlaždice = 0,65 m).
+
+## Postavička Toník (Blender → three.js)
+
+Toník je 3D model `public/assets/character/avatar.glb`, který vytváří skript `tools/blender/avatar.py`
+(tvary, kostra a akce pro všechny pózy: `idle`, `walk`, `sit`, `sleep`, `blanket`, `read`, `warm`, `press`, `shower`, `dance`).
+Ve hře ho přehrává `src/game/scene/three/Avatar3D.ts` – přepíná animace podle pózy, natáčí postavu ve směru chůze,
+mění barvy (zima, horko, mokré vlasy, sprcha) a zapíná doplňky (deka, kniha, ručník, čepice).
+Výraz obličeje se kreslí do plátna (`src/game/scene/face.ts`), které je texturou na obličeji modelu.
+Za nábytek se postava schová sama díky hloubkové mapě podkladu.
+
+```bash
+cd tools/blender
+blender -b --factory-startup --python avatar.py -- ../../public/assets/character glb        # model do hry
+blender -b --factory-startup --python avatar.py -- <out_dir> preview [iso|side]            # .blend + náhled všech póz
+```
 
 ## Spuštění lokálně
 
@@ -74,6 +89,7 @@ src/
 │   ├── engine/                # GameEngine (režisér), event bus, audio
 │   ├── interactions/actions.ts# útok, obnovení, ochrana – mění jen herní stav
 │   ├── character/             # model postavy + navigace po grafu (bez grafiky)
+│   ├── robots/                # logika robotického vysavače (úklid, dok, útoky) bez grafiky
 │   ├── scenarios/             # PŘÍBĚHY: reakce na útoky + volné aktivity
 │   └── scene/                 # VYKRESLOVÁNÍ: 3D vrstva (three.js) + efekty a UI ve scéně (PixiJS)
 └── components/                # React UI: úvod, konfigurátor, hackerský panel, vyhodnocení
@@ -85,8 +101,8 @@ src/
   (`walkTo`, `emote`, `say`, `hotWater()`, `heating()`…). O vykreslování nevědí nic.
 - **Stavy zařízení:** `normal`, `compromised`, `disabled`, `protected`, `recovering`.
   Funkční důsledky (je teplá voda? topí se?) odvozuje `deviceLogic` v `gameStore.ts`.
-- **Izometrické řazení:** objekty mají hloubku `x + y`, postava se řadí dynamicky.
-  Předměty, které ji zakrývají, se zprůhlední.
+- **Hloubka z Blenderu:** podklad zapisuje do depth bufferu hloubku z renderu, takže živé 3D objekty
+  (postava, vysavač, dveře…) se samy schovají za nábytek a stěny.
 - **Statické nasazení:** žádný backend, vše běží v prohlížeči.
 
 ### Jak přidat nový scénář
@@ -112,14 +128,17 @@ Pak ho přidat do `reactionScenarios` v `src/game/scenarios/index.ts` (a přípa
 ### Jak přidat nové zařízení
 
 1. Záznam v `src/config/devices.ts` (nastavit `available: true` a doplnit `attacks`).
-2. Vizuál v `src/game/scene/assets/devices.ts` – potomek `DeviceView` (odznak, zvýraznění a animace blokace jsou zděděné).
+2. Vizuál v `src/game/scene/assets/` – potomek `DeviceView` (odznak, zvýraznění a animace blokace jsou zděděné).
+   Živé 3D díly používají materiály z `scene/three/toon.ts`, aby jasem seděly k zapečenému podkladu.
+   Pohyblivé zařízení může posouvat odznak (`badgeAnchor`) i oblast klepnutí (`setHitAreas`) – viz `vacuum.ts`.
 3. Zaregistrovat ho v `SceneRenderer.init()`.
-4. Funkční důsledek do `deviceLogic` a scénáře do `src/game/scenarios/`.
+4. Scénáře do `src/game/scenarios/` – stav zařízení zjistí přes `ctx.mode(id)` (vrací aktivní útok nebo `normal`).
 
 ### Grafika
 
-MVP kreslí všechny assety procedurálně (vektorově) přes PixiJS – nic se nestahuje a vše je ostré při každém přiblížení.
-Třídy v `scene/assets` a `scene/house.ts` lze kdykoli nahradit sprity / spritesheety (`public/assets/…`) bez zásahu do herní logiky.
+Dům je předrenderovaný v Blenderu (`tools/blender/house.py`), postavička je 3D model (`tools/blender/avatar.py`).
+Živé prvky zařízení jsou malé 3D objekty v `scene/three` a `scene/assets`, efekty, bubliny a odznaky kreslí PixiJS nad scénou.
+Zvuky se syntetizují přes WebAudio (`game/engine/audio.ts`), nic se nestahuje.
 
 ## Před ostrým spuštěním
 

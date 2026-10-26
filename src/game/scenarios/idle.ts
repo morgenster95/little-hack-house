@@ -8,7 +8,7 @@ const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 export const idleActivities: Scenario[] = [
   {
     id: 'watch-tv',
-    idle: { weight: 4, when: (c) => c.lights() !== 'off' && c.heating() !== 'off' },
+    idle: { weight: 4, when: (c) => c.lights() !== 'off' && c.heating() !== 'off' && c.mode('tv') === 'normal' },
     async run(ctx) {
       ctx.activity(`${N} sleduje televizi`);
       await ctx.walkTo('sofaSeat');
@@ -151,7 +151,127 @@ export const idleActivities: Scenario[] = [
       await ctx.wait(900);
     },
   },
+  {
+    id: 'laundry',
+    idle: { weight: 1.3, when: (c) => c.mode('washer') === 'normal' },
+    async run(ctx) {
+      ctx.activity(`${N} pere prádlo`);
+      await ctx.walkTo('washer');
+      ctx.face('nw');
+      ctx.pose('press');
+      ctx.sfx('beep');
+      await ctx.wait(900);
+      ctx.pose('stand');
+      ctx.scene('washing', true);
+      ctx.expression('happy');
+      await ctx.wait(2500);
+      ctx.emote('sparkle', 1400);
+      await ctx.wait(1600);
+    },
+  },
+  {
+    id: 'phone-scroll',
+    idle: { weight: 1.5 },
+    async run(ctx) {
+      ctx.activity(`${N} si čte zprávy v mobilu`);
+      await ctx.walkTo(Math.random() < 0.5 ? 'livingMid' : 'front');
+      ctx.face('front');
+      ctx.pose('phone');
+      ctx.expression('neutral');
+      await ctx.wait(rnd(2500, 3500));
+      ctx.expression('happy');
+      ctx.emote(Math.random() < 0.5 ? 'heart' : 'note', 1400);
+      await ctx.wait(1600);
+      ctx.pose('stand');
+    },
+  },
   // --- aktivity podmíněné útoky ---
+  {
+    id: 'hide-from-vacuum',
+    idle: { weight: 6, when: (c) => c.mode('vacuum') === 'chase' },
+    async run(ctx) {
+      ctx.activity(`${N} se schovává před vysavačem`);
+      await ctx.walkTo('sofaSeat', 3.4);
+      ctx.face('front');
+      ctx.pose('tuck');
+      ctx.expression('scared');
+      await ctx.wait(2500);
+      ctx.emote('exclaim', 1300);
+      ctx.comfort(-2);
+      await ctx.wait(3000);
+    },
+  },
+  {
+    id: 'escape-noise',
+    idle: { weight: 6, when: (c) => c.mode('tv') === 'loud' },
+    async run(ctx) {
+      ctx.activity(`${N} utíká před hlukem`);
+      await ctx.walkTo('bathCenter', 3);
+      ctx.face('front');
+      ctx.pose('ears');
+      ctx.expression('angry');
+      ctx.emote('anger', 1600);
+      ctx.comfort(-2);
+      await ctx.wait(4000);
+    },
+  },
+  {
+    id: 'hold-door',
+    idle: { weight: 6, when: (c) => c.mode('lock') === 'unlock' },
+    async run(ctx) {
+      ctx.activity(`${N} hlídá otevřené dveře`);
+      await ctx.walkTo('entry');
+      ctx.face('sw');
+      ctx.pose('press');
+      ctx.scene('doorHeld', true);
+      ctx.expression('scared');
+      await ctx.wait(3000);
+      ctx.emote('question', 1500);
+      ctx.comfort(-2);
+      await ctx.wait(2500);
+    },
+  },
+  {
+    id: 'hide-from-camera',
+    idle: { weight: 5, when: (c) => c.mode('camera') === 'peek' },
+    async run(ctx) {
+      ctx.activity(`${N} se schovává před kamerou`);
+      await ctx.walkTo('bathCenter');
+      ctx.face('front');
+      ctx.expression('sad');
+      ctx.say('Tady mě aspoň nevidí.');
+      ctx.comfort(-2);
+      await ctx.wait(4500);
+    },
+  },
+  {
+    id: 'creepy-blanket',
+    idle: { weight: 5, when: (c) => c.mode('speaker') === 'creepy' },
+    async run(ctx) {
+      ctx.activity(`${N} se bojí hlasu z reproduktoru`);
+      await ctx.walkTo('sofaSeat');
+      ctx.face('front');
+      ctx.pose('blanket');
+      ctx.expression('scared');
+      ctx.flag('shiver', true);
+      ctx.comfort(-2);
+      await ctx.wait(5000);
+    },
+  },
+  {
+    id: 'flood-sad',
+    idle: { weight: 4, when: (c) => c.mode('washer') === 'flood' },
+    async run(ctx) {
+      ctx.activity(`${N} smutně kouká na louži`);
+      ctx.flag('wet', true);
+      await ctx.walkTo('bathMat');
+      ctx.face('front');
+      ctx.expression('sad');
+      ctx.emote('question', 1600);
+      ctx.comfort(-2);
+      await ctx.wait(4000);
+    },
+  },
   {
     id: 'cold-blanket',
     idle: { weight: 6, when: (c) => c.heating() === 'off' },

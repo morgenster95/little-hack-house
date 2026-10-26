@@ -4,8 +4,13 @@ import { GRID } from '../../config/layout';
 import { isAttacked, useGameStore } from '../../stores/gameStore';
 import type { CharacterController } from '../character/CharacterController';
 import type { SceneFlag } from '../scenarios/types';
+import { CameraView } from './assets/camera';
 import { BoilerView, DeviceView, HeatingView, houseOutline, Layers, LightsView } from './assets/devices';
-import { CHAR_CANVAS, CharacterView } from './CharacterView';
+import { LockView } from './assets/lock';
+import { SpeakerView, TvView } from './assets/media';
+import { VacuumView } from './assets/vacuum';
+import { WasherView } from './assets/washer';
+import { CharacterView } from './CharacterView';
 import { Particles } from './effects';
 import { iso, pts } from './iso';
 import { P } from './palette';
@@ -23,14 +28,12 @@ export interface SceneHost {
 
 /**
  * Scéna má tři vrstvy nad sebou:
- *  1. View3D (three.js) – dům předrenderovaný v Blenderu s hloubkou, displeje zařízení, postavička,
- *  2. plátno postavičky (Pixi, mimo stránku) – textura pro billboard ve 3D,
- *  3. překryvná Pixi vrstva – efekty, odznaky, bubliny, štít a ovládání (posun, zoom, klepnutí).
+ *  1. View3D (three.js) – dům předrenderovaný v Blenderu s hloubkou, displeje zařízení, 3D postavička,
+ *  2. překryvná Pixi vrstva – efekty, odznaky, bubliny, štít a ovládání (posun, zoom, klepnutí).
  * 3D kamera kopíruje transformaci Pixi kamery, takže obě vrstvy sdílejí izometrické souřadnice.
  */
 export class SceneRenderer {
   app = new Application();
-  private charApp = new Application();
   private view3d!: View3D;
   private camera = new Container();
   private world = new Container();
@@ -72,16 +75,7 @@ export class SceneRenderer {
         resolution: Math.min(window.devicePixelRatio || 1, 2),
         autoDensity: true,
       }),
-      this.charApp.init({
-        width: CHAR_CANVAS.w,
-        height: CHAR_CANVAS.h,
-        backgroundAlpha: 0,
-        antialias: true,
-        resolution: 3,
-        autoStart: false,
-        preference: 'webgl',
-      }),
-      this.view3d.load(`${import.meta.env.BASE_URL}assets/scene/`),
+      this.view3d.load(`${import.meta.env.BASE_URL}assets/scene/`, `${import.meta.env.BASE_URL}assets/character/avatar.glb`),
     ]);
     if (this.destroyed) {
       this.disposeAll();
@@ -103,14 +97,18 @@ export class SceneRenderer {
     this.app.stage.addChild(this.camera);
 
     this.buildSceneFx();
-    const layers: Layers = { glow: this.glow, fx: this.fx, hit: this.hit, view: this.view3d };
+    const layers: Layers = { glow: this.glow, fx: this.fx, hit: this.hit, view: this.view3d, char: this.host.char.model, flags: this.host.sceneFlags };
     const opts = { onTap: (id: DeviceId) => this.host.onDeviceTap(id), canTap: () => this.dragDist < 8 };
     this.devices.boiler = new BoilerView(layers, opts);
     this.devices.heating = new HeatingView(layers, opts);
     this.devices.lights = new LightsView(layers, opts);
+    this.devices.vacuum = new VacuumView(layers, opts);
+    this.devices.tv = new TvView(layers, opts);
+    this.devices.speaker = new SpeakerView(layers, opts);
+    this.devices.camera = new CameraView(layers, opts);
+    this.devices.washer = new WasherView(layers, opts);
+    this.devices.lock = new LockView(layers, opts);
 
-    this.charApp.stage.addChild(this.charView.node);
-    this.view3d.attachSprite(this.charApp.canvas, CHAR_CANVAS.w, CHAR_CANVAS.h, CHAR_CANVAS.footY);
     this.fx.addChild(this.charView.fx);
     this.effects.addChild(this.shower.g);
 
@@ -148,7 +146,6 @@ export class SceneRenderer {
   private disposeAll() {
     try {
       this.app.destroy(true, { children: true });
-      this.charApp.destroy(true, { children: true });
       this.view3d.dispose();
     } catch {
       /* ignore */
@@ -260,12 +257,11 @@ export class SceneRenderer {
       dv.frame({ t, dt, smart: s.smart[id], status: s.devices[id].status, attack: s.devices[id].attack, attacked: isAttacked(id, s) });
     }
 
-    // postava: nakreslit do jejího plátna a postavit billboard
+    // postava: 3D model + efekty kolem ní
     const m = this.host.char.model;
     this.host.char.update(dt);
     this.charView.update(m, this.host.char.time, dt);
-    this.charApp.renderer.render(this.charApp.stage);
-    this.view3d.placeSprite(m.x, m.y, this.charView.bias, this.charView.shadowAlpha);
+    this.view3d.avatar.update(m, this.host.char.time, dt);
 
     // scénické efekty
     const flags = this.host.sceneFlags;

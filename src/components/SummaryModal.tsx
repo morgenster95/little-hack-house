@@ -55,7 +55,7 @@ export function SummaryModal() {
 
         <h3>Objevené situace</h3>
         <div className="outcomes">
-          {OUTCOMES.map((o) =>
+          {[...OUTCOMES.filter((o) => found.has(o.id)), ...OUTCOMES.filter((o) => !found.has(o.id))].map((o) =>
             found.has(o.id) ? (
               <div key={o.id} className="outcome found">
                 <span className="oc-emoji">{o.emoji}</span>

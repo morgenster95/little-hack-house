@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { TILE_M } from '../space';
 
 /** Pozice v mřížce + výška v metrech → bod ve 3D scéně. */
-const at = (gx: number, gy: number, z: number) => new THREE.Vector3(gx * TILE_M, -gy * TILE_M, z);
+export const at = (gx: number, gy: number, z: number) => new THREE.Vector3(gx * TILE_M, -gy * TILE_M, z);
 
 /** Rovina natočená do místnosti (normála −Y), tj. na zadní stěnu nebo čelo zařízení. */
-function facingRoom(o: THREE.Object3D) {
+export function facingRoom(o: THREE.Object3D) {
   o.rotation.x = Math.PI / 2;
   return o;
 }
@@ -18,7 +18,7 @@ function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, w: number,
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 
 /** Svítící displej: plátno → textura na rovině. Překresluje se jen při změně obsahu. */
-class Screen {
+export class Screen {
   canvas = document.createElement('canvas');
   ctx: CanvasRenderingContext2D;
   tex: THREE.CanvasTexture;
@@ -54,7 +54,7 @@ export interface DisplayState {
   led: number;
 }
 
-function drawDisplay(s: DisplayState) {
+export function drawDisplay(s: DisplayState) {
   return (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     rounded(ctx, 0, 0, w, h, 22);
     ctx.fillStyle = hex(s.bg);

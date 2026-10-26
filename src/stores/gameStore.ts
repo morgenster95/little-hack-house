@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DeviceId, DeviceStatus, PLAYABLE_DEVICES } from '../config/devices';
+import { DEVICE_IDS, DeviceId, DeviceStatus, PLAYABLE_DEVICES } from '../config/devices';
 
 export type Phase = 'intro' | 'config' | 'play';
 
@@ -56,9 +56,7 @@ interface GameState {
 
 const initialDevices = (): Record<DeviceId, DeviceRuntime> => {
   const out = {} as Record<DeviceId, DeviceRuntime>;
-  (['boiler', 'heating', 'lights', 'thermostat', 'tv', 'camera', 'washer', 'lock', 'coffee', 'fridge'] as DeviceId[]).forEach(
-    (id) => (out[id] = { status: 'normal', attack: null }),
-  );
+  DEVICE_IDS.forEach((id) => (out[id] = { status: 'normal', attack: null }));
   return out;
 };
 
@@ -125,8 +123,15 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'little-hack-house',
-      version: 1,
+      version: 2,
       partialize: (s) => ({ smart: s.smart, sfx: s.sfx, music: s.music }),
+      // v2 přibyla nová zařízení – zapnout je i hráčům s uloženou konfigurací
+      migrate: (persisted, version) => {
+        const p = persisted as Partial<Pick<GameState, 'smart' | 'sfx' | 'music'>>;
+        const smart = initialSmart();
+        if (p.smart) for (const id of DEVICE_IDS) if (version >= 2 || ['boiler', 'heating', 'lights'].includes(id)) smart[id] = p.smart[id] ?? smart[id];
+        return { ...p, smart } as GameState;
+      },
     },
   ),
 );
@@ -141,6 +146,9 @@ export function isAttacked(id: DeviceId, s = useGameStore.getState()) {
 }
 
 export const deviceLogic = {
+  /** Aktivní útok na zařízení ('normal', když není napadené). */
+  mode: (id: DeviceId, s = useGameStore.getState()): string => (isAttacked(id, s) ? (s.devices[id].attack ?? 'normal') : 'normal'),
+  anyAttack: (s = useGameStore.getState()) => DEVICE_IDS.some((id) => isAttacked(id, s)),
   hotWater: (s = useGameStore.getState()) => !isAttacked('boiler', s),
   heating: (s = useGameStore.getState()): HeatMode => {
     if (!isAttacked('heating', s)) return 'normal';

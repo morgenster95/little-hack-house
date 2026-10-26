@@ -2,7 +2,20 @@ import { WaypointId } from '../../config/layout';
 import { AbortedError, sleep } from '../engine/events';
 import { findPath, wp } from './navigation';
 
-export type Pose = 'stand' | 'sit' | 'shower' | 'sleep' | 'warm' | 'blanket' | 'dance' | 'read' | 'press';
+export type Pose =
+  | 'stand'
+  | 'sit'
+  | 'shower'
+  | 'sleep'
+  | 'warm'
+  | 'blanket'
+  | 'dance'
+  | 'read'
+  | 'press'
+  | 'slip'
+  | 'ears'
+  | 'tuck'
+  | 'phone';
 export type Expression =
   | 'neutral'
   | 'happy'
@@ -31,7 +44,11 @@ export type EmoteId =
   | 'fire'
   | 'shield';
 export type CharFlag = 'wet' | 'shiver' | 'sweat' | 'flashlight' | 'warmGlow' | 'showerCap';
-export type Facing = 'left' | 'right' | 'front' | 'back';
+/**
+ * Kam se postava dívá: left/right/front/back podle obrazovky (back = ke zdi y = 0),
+ * sw/se/nw/ne přesně podél os mřížky (sw = +y, k televizi a ke dveřím; nw = −x, k pračce).
+ */
+export type Facing = 'left' | 'right' | 'front' | 'back' | 'sw' | 'se' | 'nw' | 'ne';
 
 /** Čistý model postavičky – nic nevykresluje, jen drží stav. */
 export class CharacterModel {
