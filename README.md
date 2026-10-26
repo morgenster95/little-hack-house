@@ -17,7 +17,7 @@ sleduje, jak to obyvatel **Toník** odnese, a nakonec zapne ochranu a zkusí út
 | Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička jako živý 3D model s animacemi |
 | Konfigurátor (9 zařízení: bojler, topení, osvětlení, robotický vysavač, televize, hlasový asistent, kamera, pračka, zámek + kávovar a lednice „již brzy") | ✅ karty i klepnutí přímo do scény, ukládání do localStorage |
 | Běžná vs. chytrá varianta zařízení | ✅ chytrá má displej, LED a odznak stavu |
-| Simulované útoky (23 útoků na 9 zařízení) | ✅ živé 3D prvky: jezdící vysavač, otočná kamera, buben pračky, louže, dveře |
+| Simulované útoky (22 útoků na 9 zařízení) | ✅ živé 3D prvky: jezdící vysavač, otočná kamera, buben pračky, louže, dveře |
 | Animovaná postavička s autonomním chováním | ✅ 3D model se 14 animacemi, 20 aktivit, 13 výrazů, 12 emoji bublin |
 | Hlavní scénář bojler → studená sprcha → radiátor | ✅ výsledek se liší podle stavu topení |
 | Kombinace útoků | ✅ např. tma + zima, studená sprcha potmě, odemčené dveře + vypnutá kamera |
