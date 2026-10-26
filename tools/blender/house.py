@@ -339,8 +339,10 @@ def wall_along_x(name, gy0, gy1, gx0, gx1, z0, z1, holes=(), material=None):
     material = material or M['wall']
     xs = [gx0]
     for (a, b, za, zb) in sorted(holes):
-        gbox(f'{name}_h{a}_lo', a, gy0, b, gy1, z0, za, material, C_HOUSE, r=0.004)
-        gbox(f'{name}_h{a}_hi', a, gy0, b, gy1, zb, z1, material, C_HOUSE, r=0.004)
+        if za > z0:
+            gbox(f'{name}_h{a}_lo', a, gy0, b, gy1, z0, za, material, C_HOUSE, r=0.004)
+        if zb < z1:
+            gbox(f'{name}_h{a}_hi', a, gy0, b, gy1, zb, z1, material, C_HOUSE, r=0.004)
         xs += [a, b]
     xs.append(gx1)
     for i in range(0, len(xs), 2):
@@ -352,8 +354,10 @@ def wall_along_y(name, gx0, gx1, gy0, gy1, z0, z1, holes=(), material=None):
     material = material or M['wall']
     ys = [gy0]
     for (a, b, za, zb) in sorted(holes):
-        gbox(f'{name}_h{a}_lo', gx0, a, gx1, b, z0, za, material, C_HOUSE, r=0.004)
-        gbox(f'{name}_h{a}_hi', gx0, a, gx1, b, zb, z1, material, C_HOUSE, r=0.004)
+        if za > z0:
+            gbox(f'{name}_h{a}_lo', gx0, a, gx1, b, z0, za, material, C_HOUSE, r=0.004)
+        if zb < z1:
+            gbox(f'{name}_h{a}_hi', gx0, a, gx1, b, zb, z1, material, C_HOUSE, r=0.004)
         ys += [a, b]
     ys.append(gy1)
     for i in range(0, len(ys), 2):
