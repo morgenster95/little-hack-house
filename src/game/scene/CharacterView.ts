@@ -2,6 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import type { CharacterModel, Expression } from '../character/CharacterController';
 import { EmoteBubble, Particles, SpeechBubble } from './effects';
 import { iso, mix, OUTLINE } from './iso';
+import { FLOOR_M, zpx } from './space';
 
 const SKIN = 0xffd9bd;
 const HAIR = 0x7a4b33;
@@ -13,9 +14,21 @@ const INK = 0x3b2a26;
 
 const SEATED = new Set(['sit', 'sleep', 'blanket', 'read']);
 
-/** Vykreslení postavičky z modelu. Celá grafika je procedurální (vektorová). */
+/** Postavička je kreslená v původních jednotkách; v novém domě je o čtvrtinu větší. */
+export const CHAR_SCALE = 1.25;
+/** Plátno billboardu postavičky (izometrické px) – chodidla jsou na řádku footY. */
+export const CHAR_CANVAS = { w: 120, h: 200, footY: 186 };
+
+/**
+ * Vykreslení postavičky z modelu. Celá grafika je procedurální (vektorová).
+ * Tělo (node) se kreslí do samostatného plátna, které 3D scéna zobrazí jako billboard;
+ * záře a bubliny (fx) jsou v překryvné vrstvě nad scénou.
+ */
 export class CharacterView {
   node = new Container();
+  /** posun billboardu ke kameře (m), aby ho nezakryl sedák, na kterém sedí */
+  bias = 0.15;
+  shadowAlpha = 0.18;
   private body = new Graphics();
   private particles = new Particles();
   fx = new Container();
@@ -31,9 +44,9 @@ export class CharacterView {
   }
 
   update(m: CharacterModel, now: number, dt: number) {
-    const p = iso(m.x, m.y, 0);
+    const p = iso(m.x, m.y, zpx(FLOOR_M));
     const seated = SEATED.has(m.pose);
-    const seat = seated ? 21 : 0;
+    const seat = seated ? 24 : 0;
     let hop = 0;
     if (m.hopStart >= 0) {
       const k = Math.min(1, (now - m.hopStart) / 450);
@@ -41,10 +54,12 @@ export class CharacterView {
     }
     const bob = m.moving ? Math.abs(Math.sin(m.walkPhase)) * 2.2 : m.pose === 'dance' ? Math.abs(Math.sin(now / 160)) * 5 : 0;
     const shiver = m.flags.has('shiver') ? Math.sin(now / 22) * 1.3 : 0;
-    this.node.position.set(p.x + shiver, p.y);
-    this.glow.position.set(p.x + shiver, p.y);
-    const bias = seated ? (m.pose === 'read' ? 0.6 : 0.35) : m.depthBias;
-    this.node.zIndex = (m.x + m.y + bias) * 100;
+    this.node.position.set(CHAR_CANVAS.w / 2 + shiver * CHAR_SCALE, CHAR_CANVAS.footY);
+    this.node.scale.set(CHAR_SCALE);
+    this.glow.position.set(p.x + shiver * CHAR_SCALE, p.y);
+    this.glow.scale.set(CHAR_SCALE);
+    this.bias = seated ? 0.5 : 0.15 + m.depthBias;
+    this.shadowAlpha = seat + hop > 18 ? 0.08 : 0.2;
 
     this.draw(m, now, seat + hop + bob);
     this.drawGlow(m, now, seat);
@@ -68,8 +83,8 @@ export class CharacterView {
     this.particles.update(dt);
 
     // bubliny
-    const headY = p.y - seat - hop - 74;
-    this.emote.container.position.set(p.x + 20, headY - 4);
+    const headY = p.y - (seat + hop + 74) * CHAR_SCALE;
+    this.emote.container.position.set(p.x + 20 * CHAR_SCALE, headY - 4);
     this.emote.draw(m.emote?.id ?? null, m.emote ? now - m.emote.born : 0, now);
     this.speech.container.position.set(p.x, headY - (m.emote ? 34 : 6));
     this.speech.draw(m.speech?.text ?? null, m.speech ? now - m.speech.born : 0);
@@ -103,9 +118,6 @@ export class CharacterView {
     const hair = m.flags.has('wet') ? 0x5a3524 : HAIR;
     const sweater = shower ? skin : SWEATER;
     const sweaterDark = shower ? mix(skin, 0x000000, 0.08) : SWEATER_DARK;
-
-    // stín
-    g.ellipse(0, 0, 13, 5).fill({ color: 0x3b2a26, alpha: lift > 18 ? 0.1 : 0.18 });
 
     const y0 = -lift;
 

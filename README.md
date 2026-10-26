@@ -14,7 +14,7 @@ sleduje, jak to obyvatel **Toník** odnese, a nakonec zapne ochranu a zkusí út
 
 | Oblast | Stav |
 |---|---|
-| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ procedurální vektorová grafika (PixiJS) |
+| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička zatím vektorová |
 | Konfigurátor (bojler, topení, osvětlení + 7 zařízení „již brzy") | ✅ karty i klepnutí přímo do scény, ukládání do localStorage |
 | Běžná vs. chytrá varianta zařízení | ✅ chytrá má displej, LED a odznak stavu |
 | Simulované útoky (8 útoků na 3 zařízení) | ✅ |
@@ -26,6 +26,25 @@ sleduje, jak to obyvatel **Toník** odnese, a nakonec zapne ochranu a zkusí út
 | Zvuky + hudba | ✅ syntetizované přes WebAudio (bez souborů), lze vypnout |
 | Mobil | ✅ spodní panel, posun a přiblížení scény prsty |
 | Nasazení | ✅ GitHub Actions → GitHub Pages |
+
+## Grafika domu (Blender)
+
+Dům je vymodelovaný skriptem `tools/blender/house.py` a vyrenderovaný v Blenderu (Cycles).
+Hra zobrazuje hotový obrázek `public/assets/scene/scene.webp` a k němu hloubkovou mapu
+`scene_depth.png`, díky které se postavička schová za nábytek a stěny. Živé prvky
+(displeje bojleru a termostatu, chytré žárovky) jsou ve hře jako 3D objekty (`src/game/scene/three/`),
+efekty, odznaky a bubliny kreslí Pixi vrstva nad scénou.
+
+Přegenerování po úpravě `house.py` (Blender 5.x, Python s Pillow):
+
+```bash
+cd tools/blender
+blender -b --factory-startup --python house.py -- <export_dir> export 3072   # barva + hloubka
+python pack.py <export_dir> ../../public/assets/scene                       # ořez, WebP, zabalení hloubky
+blender -b --factory-startup --python house.py -- <out_dir> final           # jen náhledový render
+```
+
+Rozmístění v `house.py` odpovídá mřížce v `src/config/layout.ts` (1 dlaždice = 0,65 m).
 
 ## Spuštění lokálně
 
@@ -56,7 +75,7 @@ src/
 │   ├── interactions/actions.ts# útok, obnovení, ochrana – mění jen herní stav
 │   ├── character/             # model postavy + navigace po grafu (bez grafiky)
 │   ├── scenarios/             # PŘÍBĚHY: reakce na útoky + volné aktivity
-│   └── scene/                 # VYKRESLOVÁNÍ (PixiJS): dům, zařízení, postava, efekty
+│   └── scene/                 # VYKRESLOVÁNÍ: 3D vrstva (three.js) + efekty a UI ve scéně (PixiJS)
 └── components/                # React UI: úvod, konfigurátor, hackerský panel, vyhodnocení
 ```
 

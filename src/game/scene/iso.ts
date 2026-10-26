@@ -129,3 +129,23 @@ export function cylinder(g: Graphics, cx: number, cy: number, r: number, z0: num
   g.ellipse(t.x, t.y, rx, ry).fill(color);
   if (outline) g.stroke(OUTLINE);
 }
+
+/** Obrys (konvexní obal) kvádru v izometrických px – pro oblasti klepnutí. */
+export function isoHull(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) {
+  const p: { x: number; y: number }[] = [];
+  for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) p.push(iso(x, y, z));
+  p.sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: typeof p = [];
+  const upper: typeof p = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  for (const q of [...p].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)].flatMap((q) => [q.x, q.y]);
+}

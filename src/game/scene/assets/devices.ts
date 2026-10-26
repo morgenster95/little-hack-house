@@ -1,15 +1,17 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Polygon } from 'pixi.js';
 import type { DeviceId, DeviceStatus } from '../../../config/devices';
-import { GRID } from '../../../config/layout';
-import type { SceneObject } from '../house';
-import { box, cylinder, iso, OUTLINE, pts, quadX, quadY, shade } from '../iso';
+import { iso, isoHull, pts, quadY } from '../iso';
 import { P } from '../palette';
+import { zpx } from '../space';
+import type { DisplayState } from '../three/props';
+import type { View3D } from '../three/View3D';
 
 export interface Layers {
   glow: Container;
-  overlay: Container;
   fx: Container;
-  add: (o: SceneObject) => void;
+  /** neviditelné oblasti pro klepnutí na zařízení */
+  hit: Container;
+  view: View3D;
 }
 
 export interface DeviceFrame {
@@ -26,17 +28,10 @@ export interface DeviceViewOptions {
   canTap: () => boolean;
 }
 
-function label(text: string, size = 9, color = 0xffffff) {
-  const t = new Text({ text, style: { fontFamily: 'Fredoka, Nunito, sans-serif', fontSize: size, fontWeight: '700', fill: color } });
-  t.resolution = 4;
-  t.anchor.set(0.5);
-  return t;
-}
-
 /**
  * Společný základ vizuálu chytrého zařízení: odznak stavu, zvýraznění,
- * animace zablokování. Konkrétní grafika je v potomcích – lze ji vyměnit
- * za sprity bez zásahu do herní logiky.
+ * animace zablokování a oblast pro klepnutí. Samotná zařízení jsou
+ * v předrenderovaném podkladu, potomci řídí jen živé 3D prvky a efekty.
  */
 export abstract class DeviceView {
   hover = false;
@@ -50,12 +45,14 @@ export abstract class DeviceView {
   private blockT = -1;
   private popT = -1;
   private badgeAnchor: { x: number; y: number };
+  private hits: Container[] = [];
 
   constructor(
     public id: DeviceId,
     protected L: Layers,
     badgePos: [number, number, number],
     private footprint: [number, number, number, number],
+    hitAreas: number[][],
     protected opts: DeviceViewOptions,
   ) {
     this.badgeAnchor = iso(...badgePos);
@@ -64,19 +61,22 @@ export abstract class DeviceView {
     L.fx.addChild(this.badge);
     L.fx.addChild(this.shieldFx);
     L.glow.addChild(this.ring);
+    for (const pts of hitAreas) {
+      const node = new Container();
+      node.hitArea = new Polygon(pts);
+      node.eventMode = 'static';
+      node.on('pointerover', () => (this.hover = true));
+      node.on('pointerout', () => (this.hover = false));
+      node.on('pointertap', () => {
+        if (this.opts.canTap()) this.opts.onTap(this.id);
+      });
+      L.hit.addChild(node);
+      this.hits.push(node);
+    }
   }
 
-  protected interactive(node: Container) {
-    node.eventMode = 'static';
-    node.on('pointerover', () => (this.hover = true));
-    node.on('pointerout', () => (this.hover = false));
-    node.on('pointertap', () => {
-      if (this.opts.canTap()) this.opts.onTap(this.id);
-    });
-  }
-
-  protected setCursor(nodes: Container[], on: boolean) {
-    nodes.forEach((n) => (n.cursor = on ? 'pointer' : 'default'));
+  protected onSmartChange(smart: boolean) {
+    this.hits.forEach((n) => (n.cursor = smart ? 'pointer' : 'default'));
   }
 
   playBlocked(t: number) {
@@ -96,7 +96,6 @@ export abstract class DeviceView {
     this.draw(f);
   }
 
-  protected abstract onSmartChange(smart: boolean): void;
   protected abstract draw(f: DeviceFrame): void;
 
   private drawBadge(f: DeviceFrame) {
@@ -186,93 +185,57 @@ export abstract class DeviceView {
 /* Bojler                                                               */
 /* ------------------------------------------------------------------ */
 
+/** displej bojleru – na plášti válce natočený k divákovi (mřížka) */
+const BOILER = { x: 2.55 + 0.25, y: 0.42 + 0.25, z: 1.72 };
+
 export class BoilerView extends DeviceView {
-  private body = new Graphics();
-  private panel = new Graphics();
   private glitch = new Graphics();
-  private display = label('55°', 8);
-  private node = new Container();
-  private cx = 2.55;
-  private cy = 0.42;
 
   constructor(L: Layers, opts: DeviceViewOptions) {
-    super('boiler', L, [2.55, 0.42, 168], [2.1, 0.0, 3.0, 0.9], opts);
-    const g = this.body;
-    // trubky
-    const a = iso(2.42, 0.25, 66);
-    const b = iso(2.42, 0.25, 30);
-    const c2 = iso(2.68, 0.25, 66);
-    const d = iso(2.68, 0.25, 36);
-    g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 3, color: P.metal });
-    g.moveTo(c2.x, c2.y).lineTo(d.x, d.y).stroke({ width: 3, color: 0xe58f6f });
-    cylinder(g, this.cx, this.cy, 0.36, 66, 146, P.white);
-    const top = iso(this.cx, this.cy, 146);
-    g.ellipse(top.x, top.y - 2, 12, 5).fill(shade(P.white, 0.95));
-    // nožky/úchyty
-    quadY(g, 0.01, 2.3, 2.8, 120, 124, P.metal);
-    this.node.addChild(this.body, this.panel, this.display, this.glitch);
-    const p = iso(this.cx, this.cy, 112);
-    this.display.position.set(p.x, p.y + 9);
-    this.interactive(this.node);
-    L.add({ node: this.node, depth: 3.2 });
-  }
-
-  protected onSmartChange(smart: boolean) {
-    this.setCursor([this.node], smart);
+    super('boiler', L, [2.55, 0.42, zpx(2.75)], [2.1, 0.0, 3.0, 0.9], [isoHull(2.17, 0.05, zpx(1.05), 2.93, 0.8, zpx(2.45))], opts);
+    L.fx.addChild(this.glitch);
   }
 
   protected draw(f: DeviceFrame) {
-    const g = this.panel;
-    g.clear();
-    const p = iso(this.cx, this.cy, 112);
-    const px = p.x;
-    const py = p.y + 9;
-    if (!this.smart) {
-      // běžný bojler – analogový budík
-      this.display.visible = false;
-      g.circle(px, py, 6.5).fill(0xffffff).stroke(OUTLINE);
-      g.moveTo(px, py).lineTo(px + 3.5, py - 3.5).stroke({ width: 1.5, color: P.danger });
-      this.glitch.clear();
-      return;
-    }
-    this.display.visible = true;
-    let bg = 0x2f3a4a;
-    let txt = '55°';
-    let col = 0x8ff5d9;
+    const props = this.L.view.props;
+    props.boilerSmart.visible = this.smart;
+    props.boilerPlain.visible = !this.smart;
+    const gl = this.glitch;
+    gl.clear();
+    if (!this.smart) return;
+
+    const d: DisplayState = { text: '55°', color: 0x8ff5d9, bg: 0x1d2530, led: P.smart };
     const blink = Math.floor(f.t / 400) % 2 === 0;
     if (f.attacked) {
       if (f.attack === 'fault') {
-        txt = 'E-13';
-        col = blink ? 0xff7b8f : 0x7a3141;
+        d.text = 'E-13';
+        d.color = blink ? 0xff7b8f : 0x7a3141;
       } else if (f.attack === 'cold') {
-        txt = '10°';
-        col = 0x9fd3ff;
+        d.text = '10°';
+        d.color = 0x9fd3ff;
       } else {
-        txt = 'OFF';
-        col = 0x9fd3ff;
+        d.text = 'OFF';
+        d.color = 0x9fd3ff;
       }
+      d.led = P.hack;
     } else if (f.status === 'recovering') {
-      txt = '…';
-      col = 0xffd27a;
+      d.text = '…';
+      d.color = 0xffd27a;
+      d.bg = 0x3a3424;
+      d.led = P.warn;
     } else if (f.status === 'protected') {
-      col = 0x9ff5bf;
+      d.color = 0x9ff5bf;
+      d.led = P.protect;
     }
-    if (f.status === 'recovering') bg = 0x3a3424;
-    g.roundRect(px - 11, py - 6.5, 22, 13, 3).fill(bg).stroke({ width: 1.5, color: 0xd9d3cb });
-    // LED
-    const led = f.attacked ? P.hack : f.status === 'protected' ? P.protect : P.smart;
-    g.circle(px + 13.5, py - 4, 1.8).fill(led);
-    if (this.display.text !== txt) this.display.text = txt;
-    this.display.style.fill = col;
+    props.setBoilerDisplay(d);
 
     // jemný efekt napadení
-    const gl = this.glitch;
-    gl.clear();
     if (f.attacked) {
+      const p = iso(BOILER.x, BOILER.y, zpx(BOILER.z));
       for (let i = 0; i < 5; i++) {
         if (Math.random() < 0.45) {
-          const gx = px + (Math.random() - 0.5) * 34;
-          const gy = py - 30 + Math.random() * 60;
+          const gx = p.x + (Math.random() - 0.5) * 40;
+          const gy = p.y - 40 + Math.random() * 70;
           gl.rect(gx, gy, 2 + Math.random() * 5, 2).fill({ color: Math.random() < 0.5 ? P.hack : 0x5cf2ff, alpha: 0.8 });
         }
       }
@@ -285,86 +248,49 @@ export class BoilerView extends DeviceView {
 /* ------------------------------------------------------------------ */
 
 export class HeatingView extends DeviceView {
-  private radiator = new Container();
-  private towel = new Container();
-  private radG = new Graphics();
-  private towelG = new Graphics();
   private waves = new Graphics();
-  private thermo = new Graphics();
-  private thermoText = label('22°', 7.5);
   private frost = new Graphics();
 
   constructor(L: Layers, opts: DeviceViewOptions) {
-    super('heating', L, [5.15, 0.1, 108], [4.9, 0.0, 6.6, 0.9], opts);
-    const g = this.radG;
-    // radiátor
-    box(g, 5.0, 0, 14, 1.4, 0.22, 46, { top: P.white });
-    for (let x = 5.1; x < 6.38; x += 0.14) {
-      const a = iso(x, 0.22, 17);
-      const b = iso(x, 0.22, 57);
-      g.moveTo(a.x, a.y).lineTo(b.x, b.y);
-    }
-    g.stroke({ width: 1, color: 0xcfc8c0 });
-    box(g, 6.38, 0.05, 14, 0.1, 0.1, 10, { top: 0xd9d3cb });
-    box(g, 5.05, 0.05, 6, 0.08, 0.08, 8, { top: 0xd9d3cb }, false);
-    box(g, 6.27, 0.05, 6, 0.08, 0.08, 8, { top: 0xd9d3cb }, false);
-    this.radiator.addChild(g, this.frost);
-    this.interactive(this.radiator);
-    L.add({ node: this.radiator, depth: 5.8 });
-
-    // termostat na stěně
-    const tc = new Container();
-    tc.addChild(this.thermo, this.thermoText);
-    const tp = iso(5.72, 0, 83);
-    this.thermoText.position.set(tp.x, tp.y);
-    this.radiator.addChild(tc);
-
-    // žebříkový radiátor v koupelně
-    const t = this.towelG;
-    box(t, 0, 5.2, 26, 0.12, 0.08, 84, { top: P.white });
-    box(t, 0, 5.95, 26, 0.12, 0.08, 84, { top: P.white });
-    for (let z = 36; z < 110; z += 15) box(t, 0, 5.24, z, 0.1, 0.75, 4, { top: P.white });
-    quadX(t, 0.13, 5.36, 5.82, 56, 99, 0xf3a6a0, 1, true);
-    quadX(t, 0.13, 5.36, 5.82, 60, 63, 0xffffff, 0.6);
-    this.towel.addChild(t);
-    this.interactive(this.towel);
-    L.add({ node: this.towel, depth: 5.6 });
-
+    super(
+      'heating',
+      L,
+      [5.15, 0.1, zpx(1.85)],
+      [4.9, 0.0, 6.6, 0.9],
+      [
+        isoHull(5.0, 0.0, zpx(0.15), 6.5, 0.25, zpx(0.8)),
+        isoHull(0.0, 5.15, zpx(0.4), 0.25, 6.0, zpx(1.9)),
+        isoHull(5.53, 0.0, zpx(1.28), 5.91, 0.06, zpx(1.52)),
+      ],
+      opts,
+    );
     L.glow.addChild(this.waves);
-  }
-
-  protected onSmartChange(smart: boolean) {
-    this.setCursor([this.radiator, this.towel], smart);
+    L.fx.addChild(this.frost);
   }
 
   protected draw(f: DeviceFrame) {
     const mode = f.attacked ? (f.attack === 'overheat' ? 'max' : 'off') : 'normal';
-    // termostat
-    const th = this.thermo;
-    th.clear();
+    const props = this.L.view.props;
+    props.thermoSmart.visible = this.smart;
+    props.thermoPlain.visible = !this.smart;
     if (this.smart) {
-      quadY(th, 0.01, 5.52, 5.92, 72, 94, P.white, 1, true);
-      const tp = iso(5.72, 0, 83);
-      th.roundRect(tp.x - 7, tp.y - 5, 14, 10, 2).fill(0x2f3a4a);
-      this.thermoText.visible = true;
-      const txt = mode === 'off' ? '12°' : mode === 'max' ? '30°' : f.status === 'recovering' ? '…' : '22°';
-      if (this.thermoText.text !== txt) this.thermoText.text = txt;
-      this.thermoText.style.fill = mode === 'off' ? 0x9fd3ff : mode === 'max' ? 0xff8b6b : 0x8ff5d9;
-    } else {
-      this.thermoText.visible = false;
-      const tp = iso(6.45, 0.12, 30);
-      th.circle(tp.x, tp.y, 3.5).fill(0xffffff).stroke(OUTLINE);
+      props.setThermostatDisplay({
+        text: mode === 'off' ? '12°' : mode === 'max' ? '30°' : f.status === 'recovering' ? '…' : '22°',
+        color: mode === 'off' ? 0x9fd3ff : mode === 'max' ? 0xff8b6b : 0x8ff5d9,
+        bg: 0x1d2530,
+        led: f.attacked ? P.hack : f.status === 'protected' ? P.protect : P.smart,
+      });
     }
 
-    // vlny tepla
+    // vlny tepla / námraza
     const w = this.waves;
     w.clear();
     const fr = this.frost;
     fr.clear();
     if (mode === 'off') {
-      quadY(fr, 0.225, 5.02, 6.38, 16, 58, 0xbfe3ff, 0.35);
+      quadY(fr, 0.22, 5.02, 6.38, zpx(0.2), zpx(0.76), 0xbfe3ff, 0.35);
       for (let i = 0; i < 4; i++) {
-        const p = iso(5.2 + i * 0.33, 0.23, 30 + ((i * 13 + f.t / 60) % 24));
+        const p = iso(5.2 + i * 0.33, 0.23, zpx(0.3) + ((i * 13 + f.t / 60) % 24));
         fr.circle(p.x, p.y, 1.4).fill({ color: 0xffffff, alpha: 0.9 });
       }
       return;
@@ -372,14 +298,14 @@ export class HeatingView extends DeviceView {
     const strong = mode === 'max';
     const col = strong ? 0xff7a4d : 0xffb38a;
     const sources: [number, number, number][] = [
-      [5.15, 0.35, 62],
-      [5.7, 0.35, 62],
-      [6.25, 0.35, 62],
-      [0.25, 5.4, 110],
-      [0.25, 5.8, 110],
+      [5.15, 0.35, zpx(0.82)],
+      [5.7, 0.35, zpx(0.82)],
+      [6.25, 0.35, zpx(0.82)],
+      [0.25, 5.4, zpx(1.9)],
+      [0.25, 5.8, zpx(1.9)],
     ];
     for (const [x, y, z] of sources) {
-      const k = ((f.t / (strong ? 900 : 1600)) + x * 0.37 + y * 0.21) % 1;
+      const k = (f.t / (strong ? 900 : 1600) + x * 0.37 + y * 0.21) % 1;
       const base = iso(x, y, z + k * (strong ? 46 : 30));
       const a = Math.sin(k * Math.PI) * (strong ? 0.75 : 0.35);
       w.moveTo(base.x, base.y + 8);
@@ -394,67 +320,40 @@ export class HeatingView extends DeviceView {
 }
 
 /* ------------------------------------------------------------------ */
-/* Osvětlení: stojací lampa + 2 lustry + tma/párty overlay              */
+/* Osvětlení: stojací lampa, stolní lampa, zrcadlo + tma/párty závoj    */
 /* ------------------------------------------------------------------ */
 
-interface Lamp {
-  node: Container;
-  g: Graphics;
-  bulb: { x: number; y: number };
-  floor: { x: number; y: number };
-  kind: 'floor' | 'pendant';
-}
+/** světla v domě (mřížka) – pro světelné skvrny v režimu párty */
+const LAMPS = [
+  { x: 6.75, y: 0.45 },
+  { x: 11.45, y: 1.75 },
+  { x: 3.6, y: 0.4 },
+];
 
 export class LightsView extends DeviceView {
-  private lamps: Lamp[] = [];
   private glows = new Graphics();
-  private dark = new Graphics();
   private flickerOn = true;
   private nextFlicker = 0;
   darkness = 0;
 
   constructor(L: Layers, opts: DeviceViewOptions) {
-    super('lights', L, [9.3, 2.4, 162], [7.9, 2.0, 9.1, 3.2], opts);
-    this.addFloorLamp(6.75, 0.45);
-    this.addPendant(8.5, 2.6, 118, P.smart);
-    this.addPendant(2.4, 2.7, 124, 0xf2a6a0);
+    super(
+      'lights',
+      L,
+      [6.75, 0.45, zpx(2.05)],
+      [6.35, 0.05, 7.15, 0.85],
+      [
+        isoHull(6.5, 0.2, 0, 7.0, 0.7, zpx(1.65)),
+        isoHull(11.2, 1.5, 0, 11.7, 2.0, zpx(0.92)),
+        isoHull(3.18, 0.0, zpx(1.2), 4.02, 0.06, zpx(2.0)),
+      ],
+      opts,
+    );
     L.glow.addChild(this.glows);
-    L.overlay.addChild(this.dark);
-  }
-
-  private addFloorLamp(x: number, y: number) {
-    const node = new Container();
-    const g = new Graphics();
-    const b = iso(x, y, 0);
-    g.ellipse(b.x, b.y, 9, 4.5).fill(0x5b5160).stroke(OUTLINE);
-    const top = iso(x, y, 88);
-    g.moveTo(b.x, b.y).lineTo(top.x, top.y).stroke({ width: 2.5, color: 0x5b5160 });
-    const lg = new Graphics();
-    node.addChild(g, lg);
-    this.interactive(node);
-    this.L.add({ node, depth: x + y + 0.1 });
-    this.lamps.push({ node, g: lg, bulb: iso(x, y, 96), floor: iso(x, y + 0.3, 0), kind: 'floor' });
-  }
-
-  private addPendant(x: number, y: number, z: number, accent: number) {
-    const node = new Container();
-    const g = new Graphics();
-    const top = iso(x, y, GRID.wallH + 40);
-    const end = iso(x, y, z + 14);
-    g.moveTo(top.x, top.y).lineTo(end.x, end.y).stroke({ width: 1.5, color: 0x5b4335, alpha: 0.7 });
-    const lg = new Graphics();
-    node.addChild(g, lg);
-    (node as Container & { accent?: number }).accent = accent;
-    this.interactive(node);
-    this.L.add({ node, depth: x + y + 0.5 });
-    this.lamps.push({ node, g: lg, bulb: iso(x, y, z), floor: iso(x, y, 0), kind: 'pendant' });
-  }
-
-  protected onSmartChange(smart: boolean) {
-    this.setCursor(this.lamps.map((l) => l.node), smart);
   }
 
   protected draw(f: DeviceFrame) {
+    this.L.view.props.lampSmart.visible = this.smart;
     const mode = f.attacked ? (f.attack as 'off' | 'flicker' | 'party') : 'normal';
     let on = true;
     let lightCol = 0xffd28a;
@@ -463,14 +362,14 @@ export class LightsView extends DeviceView {
 
     if (mode === 'off') {
       on = false;
-      overlayAlpha = 0.58;
+      overlayAlpha = 0.6;
     } else if (mode === 'flicker') {
       if (f.t > this.nextFlicker) {
         this.flickerOn = !this.flickerOn;
         this.nextFlicker = f.t + (this.flickerOn ? 40 + Math.random() * 160 : 50 + Math.random() * 220);
       }
       on = this.flickerOn;
-      overlayAlpha = on ? 0 : 0.5;
+      overlayAlpha = on ? 0 : 0.52;
     } else if (mode === 'party') {
       const hues = [0xff5d9e, 0x5db8ff, 0x8cff6b, 0xffd23f, 0xb86bff];
       const i = Math.floor(f.t / 450) % hues.length;
@@ -479,57 +378,29 @@ export class LightsView extends DeviceView {
       overlayAlpha = 0.16;
     }
     this.darkness = mode === 'off' ? 1 : mode === 'flicker' && !on ? 0.85 : 0;
+    this.L.view.setOverlay(overlayCol, overlayAlpha);
 
-    // lampy
-    for (const l of this.lamps) {
-      const g = l.g;
-      g.clear();
-      const { x, y } = l.bulb;
-      const accent = (l.node as Container & { accent?: number }).accent ?? P.cushion;
-      if (l.kind === 'floor') {
-        if (on) g.circle(x, y + 2, 12).fill({ color: lightCol, alpha: 0.5 });
-        g.poly([x - 8, y - 12, x + 8, y - 12, x + 13, y + 6, x - 13, y + 6]).fill(0xfdf0d5).stroke(OUTLINE);
-        if (this.smart) g.rect(x - 12, y + 2, 24, 3).fill(P.smart);
-        if (on) g.ellipse(x, y + 6, 10, 3).fill({ color: lightCol, alpha: 0.9 });
-      } else {
-        g.poly([x - 5, y - 14, x + 5, y - 14, x + 15, y, x - 15, y]).fill(accent).stroke(OUTLINE);
-        if (this.smart) g.rect(x - 13, y - 3, 26, 2.5).fill(0xffffff);
-        g.circle(x, y + 2, 4.5).fill(on ? 0xfff4d6 : 0x9a96a6);
-        if (on) g.circle(x, y + 3, 10).fill({ color: lightCol, alpha: 0.35 });
-      }
-    }
-
-    // záře na podlaze
+    // barevné skvrny světla na podlaze (párty)
     const gl = this.glows;
     gl.clear();
-    if (on) {
-      for (const l of this.lamps) {
-        const a = l.kind === 'floor' ? 0.16 : 0.1;
-        gl.ellipse(l.floor.x, l.floor.y, 70, 32).fill({ color: lightCol, alpha: a * 0.5 });
-        gl.ellipse(l.floor.x, l.floor.y, 40, 18).fill({ color: lightCol, alpha: a });
-      }
-      const fl = this.lamps[0].bulb;
-      gl.ellipse(fl.x, fl.y - 6, 34, 40).fill({ color: lightCol, alpha: 0.12 });
-    }
-
-    // tma / barevný nádech přes celý dům
-    const d = this.dark;
-    d.clear();
-    if (overlayAlpha > 0) {
-      const W = GRID.w;
-      const D = GRID.d;
-      const H = GRID.wallH;
-      d.poly(pts([[-0.25, D, -18], [-0.25, D, H], [-0.25, -0.25, H], [W, -0.25, H], [W, -0.25, -18], [W, D, -18]])).fill({
-        color: overlayCol,
-        alpha: overlayAlpha,
-      });
-      if (mode === 'party') {
-        for (const l of this.lamps) {
-          const k = (f.t / 600 + l.bulb.x) % (Math.PI * 2);
-          d.circle(l.floor.x + Math.cos(k) * 50, l.floor.y + Math.sin(k) * 20, 14).fill({ color: lightCol, alpha: 0.25 });
-        }
+    if (mode === 'party') {
+      for (const l of LAMPS) {
+        const c = iso(l.x, l.y + 0.3, 0);
+        const k = (f.t / 600 + l.x) % (Math.PI * 2);
+        gl.ellipse(c.x + Math.cos(k) * 50, c.y + Math.sin(k) * 20, 40, 18).fill({ color: lightCol, alpha: 0.22 });
       }
     }
   }
 }
 
+/** Obrys celého domu v izometrických px (pro štít ochrany). */
+export function houseOutline(e: number, zTop: number) {
+  return pts([
+    [-0.3 - e, 7.3 + e, -24],
+    [-0.3 - e, 7.3 + e, zTop],
+    [-0.3 - e, -0.3 - e, zTop],
+    [12.3 + e, -0.3 - e, zTop],
+    [12.3 + e, -0.3 - e, -24],
+    [12.3 + e, 7.3 + e, -24],
+  ]);
+}

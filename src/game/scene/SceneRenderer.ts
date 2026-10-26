@@ -4,12 +4,16 @@ import { GRID } from '../../config/layout';
 import { isAttacked, useGameStore } from '../../stores/gameStore';
 import type { CharacterController } from '../character/CharacterController';
 import type { SceneFlag } from '../scenarios/types';
-import { BoilerView, DeviceView, HeatingView, Layers, LightsView } from './assets/devices';
-import { CharacterView } from './CharacterView';
+import { BoilerView, DeviceView, HeatingView, houseOutline, Layers, LightsView } from './assets/devices';
+import { CHAR_CANVAS, CharacterView } from './CharacterView';
 import { Particles } from './effects';
-import { buildHouse, HouseRefs, SceneObject } from './house';
 import { iso, pts } from './iso';
 import { P } from './palette';
+import { zpx } from './space';
+import { View3D } from './three/View3D';
+
+/** Výřez jen na dům (izometrické px) – pro úzké obrazovky na výšku. */
+const HOUSE_BOUNDS = { x: -245, y: -175, w: 650, h: 495 };
 
 export interface SceneHost {
   char: CharacterController;
@@ -17,27 +21,34 @@ export interface SceneHost {
   onDeviceTap: (id: DeviceId) => void;
 }
 
-const BOUNDS = { x: -250, y: -180, w: 660, h: 515 };
-
+/**
+ * Scéna má tři vrstvy nad sebou:
+ *  1. View3D (three.js) – dům předrenderovaný v Blenderu s hloubkou, displeje zařízení, postavička,
+ *  2. plátno postavičky (Pixi, mimo stránku) – textura pro billboard ve 3D,
+ *  3. překryvná Pixi vrstva – efekty, odznaky, bubliny, štít a ovládání (posun, zoom, klepnutí).
+ * 3D kamera kopíruje transformaci Pixi kamery, takže obě vrstvy sdílejí izometrické souřadnice.
+ */
 export class SceneRenderer {
   app = new Application();
+  private charApp = new Application();
+  private view3d!: View3D;
   private camera = new Container();
   private world = new Container();
-  private bg = new Container();
   private glow = new Container();
-  private objects = new Container();
-  private overlay = new Container();
+  private effects = new Container();
+  private hit = new Container();
   private fx = new Container();
   private dome = new Graphics();
+  private tvGlow = new Graphics();
+  private breeze = new Graphics();
   private devices: Partial<Record<DeviceId, DeviceView>> = {};
   private charView = new CharacterView();
-  private refs!: HouseRefs;
   private shower = new Particles();
   private showerSpawn = 0;
   private t = 0;
   private domeT = -1;
   private wasProtected = false;
-  private occluders: { node: Container; b: { x: number; y: number; w: number; h: number } | null }[] = [];
+  private bounds = { x: -250, y: -180, w: 660, h: 515 };
 
   // kamera
   private insets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -52,42 +63,56 @@ export class SceneRenderer {
   constructor(private host: SceneHost) {}
 
   async init(el: HTMLElement) {
-    await this.app.init({
-      resizeTo: el,
-      backgroundAlpha: 0,
-      antialias: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
-      autoDensity: true,
-    });
+    this.view3d = new View3D(el);
+    await Promise.all([
+      this.app.init({
+        resizeTo: el,
+        backgroundAlpha: 0,
+        antialias: true,
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
+        autoDensity: true,
+      }),
+      this.charApp.init({
+        width: CHAR_CANVAS.w,
+        height: CHAR_CANVAS.h,
+        backgroundAlpha: 0,
+        antialias: true,
+        resolution: 3,
+        autoStart: false,
+        preference: 'webgl',
+      }),
+      this.view3d.load(`${import.meta.env.BASE_URL}assets/scene/`),
+    ]);
     if (this.destroyed) {
-      this.app.destroy(true);
+      this.disposeAll();
       return;
     }
-    el.appendChild(this.app.canvas);
+    const canvas = this.app.canvas;
+    canvas.style.position = 'absolute';
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    el.appendChild(canvas);
 
-    this.objects.sortableChildren = true;
-    this.world.addChild(this.bg, this.glow, this.objects, this.overlay, this.dome, this.fx);
+    // výřez kamery: celý pozemek, okraje zahrady se mohou mírně oříznout
+    const b = this.view3d.isoBounds();
+    this.bounds = { x: b.x + b.w * 0.05, y: b.y + b.h * 0.04, w: b.w * 0.9, h: b.h * 0.92 };
+
+    this.glow.blendMode = 'add';
+    this.world.addChild(this.glow, this.effects, this.hit, this.dome, this.fx);
     this.camera.addChild(this.world);
     this.app.stage.addChild(this.camera);
 
-    const add = (o: SceneObject) => {
-      o.node.zIndex = o.depth * 100;
-      this.objects.addChild(o.node);
-      this.occluders.push({ node: o.node, b: null });
-    };
-    this.refs = buildHouse(this.bg, add);
-    this.glow.blendMode = 'add';
-
-    const layers: Layers = { glow: this.glow, overlay: this.overlay, fx: this.fx, add };
+    this.buildSceneFx();
+    const layers: Layers = { glow: this.glow, fx: this.fx, hit: this.hit, view: this.view3d };
     const opts = { onTap: (id: DeviceId) => this.host.onDeviceTap(id), canTap: () => this.dragDist < 8 };
     this.devices.boiler = new BoilerView(layers, opts);
     this.devices.heating = new HeatingView(layers, opts);
     this.devices.lights = new LightsView(layers, opts);
 
-    this.objects.addChild(this.charView.node);
+    this.charApp.stage.addChild(this.charView.node);
+    this.view3d.attachSprite(this.charApp.canvas, CHAR_CANVAS.w, CHAR_CANVAS.h, CHAR_CANVAS.footY);
     this.fx.addChild(this.charView.fx);
-    this.shower.g.zIndex = 1.86 * 100;
-    this.objects.addChild(this.shower.g);
+    this.effects.addChild(this.shower.g);
 
     this.setupInput();
     this.layout();
@@ -117,30 +142,56 @@ export class SceneRenderer {
 
   destroy() {
     this.destroyed = true;
+    if (this.app.renderer) this.disposeAll();
+  }
+
+  private disposeAll() {
     try {
-      if (this.app.renderer) this.app.destroy(true, { children: true });
+      this.app.destroy(true, { children: true });
+      this.charApp.destroy(true, { children: true });
+      this.view3d.dispose();
     } catch {
       /* ignore */
     }
   }
 
+  /** Efekty vázané na místa v domě: záře televize, průvan u okna. */
+  private buildSceneFx() {
+    const tv = this.tvGlow;
+    tv.poly(pts([[7.85, 5.62, zpx(1.1)], [9.35, 5.62, zpx(1.1)], [9.8, 1.4, 0], [7.2, 1.4, 0]])).fill({ color: 0x9fd8ff, alpha: 0.13 });
+    tv.visible = false;
+    const br = this.breeze;
+    for (let i = 0; i < 3; i++) {
+      const a = iso(10.2 + i * 0.35, 0.4 + i * 0.2, zpx(1.75) - i * 14);
+      br.moveTo(a.x, a.y).bezierCurveTo(a.x + 10, a.y - 6, a.x + 20, a.y + 6, a.x + 32, a.y);
+    }
+    br.stroke({ width: 2, color: 0xffffff, alpha: 0.9, cap: 'round' });
+    br.visible = false;
+    this.glow.addChild(tv);
+    this.effects.addChild(br);
+  }
+
   private layout() {
-    if (!this.app.renderer) return;
+    if (!this.app.renderer || !this.view3d) return;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const { top, right, bottom, left } = this.insets;
     const aw = Math.max(100, sw - left - right);
     const ah = Math.max(100, sh - top - bottom);
-    const base = Math.min(aw / BOUNDS.w, ah / BOUNDS.h, 1.9) * 0.96;
+    const B = aw < ah ? HOUSE_BOUNDS : this.bounds;
+    const base = Math.min(aw / B.w, ah / B.h, 1.9) * 0.98;
     const s = base * this.zoom;
     // omezení posunu
     const lim = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-    this.pan.x = lim(this.pan.x, (BOUNDS.w * s) / 2);
-    this.pan.y = lim(this.pan.y, (BOUNDS.h * s) / 2);
+    this.pan.x = lim(this.pan.x, (B.w * s) / 2);
+    this.pan.y = lim(this.pan.y, (B.h * s) / 2);
     const cx = left + aw / 2 + this.pan.x;
     const cy = top + ah / 2 + this.pan.y;
+    const tx = cx - (B.x + B.w / 2) * s;
+    const ty = cy - (B.y + B.h / 2) * s;
     this.camera.scale.set(s);
-    this.camera.position.set(cx - (BOUNDS.x + BOUNDS.w / 2) * s, cy - (BOUNDS.y + BOUNDS.h / 2) * s);
+    this.camera.position.set(tx, ty);
+    this.view3d.setFrame(sw, sh, s, tx, ty);
   }
 
   private setupInput() {
@@ -209,24 +260,26 @@ export class SceneRenderer {
       dv.frame({ t, dt, smart: s.smart[id], status: s.devices[id].status, attack: s.devices[id].attack, attacked: isAttacked(id, s) });
     }
 
-    // postava
+    // postava: nakreslit do jejího plátna a postavit billboard
+    const m = this.host.char.model;
     this.host.char.update(dt);
-    this.charView.update(this.host.char.model, this.host.char.time, dt);
+    this.charView.update(m, this.host.char.time, dt);
+    this.charApp.renderer.render(this.charApp.stage);
+    this.view3d.placeSprite(m.x, m.y, this.charView.bias, this.charView.shadowAlpha);
 
     // scénické efekty
     const flags = this.host.sceneFlags;
-    const tv = this.refs.tvGlow;
+    const tv = this.tvGlow;
     tv.visible = flags.has('tv');
     if (tv.visible) {
       tv.alpha = 0.75 + Math.sin(t / 90) * 0.15 + (Math.random() < 0.05 ? 0.3 : 0);
       tv.tint = [0xffffff, 0xffe0f0, 0xe0fff4, 0xfff4cc][Math.floor(t / 1600) % 4];
     }
-    this.refs.windowOpen.visible = flags.has('windowOpen');
-    this.refs.windowClosed.visible = !flags.has('windowOpen');
-    this.refs.breeze.visible = flags.has('windowOpen');
-    if (this.refs.breeze.visible) {
-      this.refs.breeze.alpha = 0.4 + Math.sin(t / 300) * 0.4;
-      this.refs.breeze.x = Math.sin(t / 500) * 6;
+    const br = this.breeze;
+    br.visible = flags.has('windowOpen');
+    if (br.visible) {
+      br.alpha = 0.4 + Math.sin(t / 300) * 0.4;
+      br.x = Math.sin(t / 500) * 6;
     }
 
     const hot = flags.has('showerHot');
@@ -234,8 +287,8 @@ export class SceneRenderer {
     this.showerSpawn += dt;
     if ((hot || cold) && this.showerSpawn > 18) {
       this.showerSpawn = 0;
-      const head = iso(0.45, 0.9, 124);
-      const floorY = iso(0.9, 0.9, 6).y;
+      const head = iso(0.5, 0.9, zpx(2.05));
+      const floorY = iso(0.9, 0.9, zpx(0.1)).y;
       for (let i = 0; i < 2; i++) {
         this.shower.spawn({
           kind: 'drop',
@@ -260,27 +313,8 @@ export class SceneRenderer {
     }
     this.shower.update(dt);
 
-    this.fadeOccluders(dt);
     this.drawDome(s.protection.active, t);
-  }
-
-  /** Předměty, které stojí před postavičkou a překrývají ji, zprůhlední. */
-  private fadeOccluders(dt: number) {
-    const cv = this.charView.node;
-    const cz = cv.zIndex;
-    const cx = cv.x;
-    const cy = cv.y;
-    const k = Math.min(1, dt / 120);
-    for (const o of this.occluders) {
-      if (!o.b) {
-        const lb = o.node.getLocalBounds();
-        o.b = { x: lb.x, y: lb.y, w: lb.width, h: lb.height };
-      }
-      const b = o.b;
-      const hit = o.node.zIndex > cz && cx + 12 > b.x && cx - 12 < b.x + b.w && cy - 12 > b.y && cy - 70 < b.y + b.h;
-      const target = hit ? 0.42 : 1;
-      o.node.alpha += (target - o.node.alpha) * k;
-    }
+    this.view3d.render();
   }
 
   private drawDome(active: boolean, t: number) {
@@ -289,11 +323,7 @@ export class SceneRenderer {
     const g = this.dome;
     g.clear();
     if (!active) return;
-    const W = GRID.w;
-    const D = GRID.d;
-    const H = GRID.wallH + 30;
-    const e = 0.22;
-    const hex = pts([[-0.25 - e, D + e, -24], [-0.25 - e, D + e, H], [-0.25 - e, -0.25 - e, H], [W + e, -0.25 - e, H], [W + e, -0.25 - e, -24], [W + e, D + e, -24]]);
+    const hex = houseOutline(0.22, zpx(2.5) + 30);
     const pulse = 0.5 + Math.sin(t / 700) * 0.5;
     g.poly(hex).fill({ color: P.protect, alpha: 0.03 + pulse * 0.02 });
     g.poly(hex).stroke({ width: 2.5, color: P.protect, alpha: 0.35 + pulse * 0.2, join: 'round' });
@@ -312,7 +342,7 @@ export class SceneRenderer {
       const kk = (t - this.domeT) / 1400;
       if (kk > 1) this.domeT = -1;
       else {
-        const c = iso(W / 2, D / 2, 60);
+        const c = iso(GRID.w / 2, GRID.d / 2, 60);
         g.ellipse(c.x, c.y, 80 + kk * 420, 40 + kk * 210).stroke({ width: 6 * (1 - kk), color: P.protect, alpha: 1 - kk });
       }
     }
