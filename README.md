@@ -14,7 +14,7 @@ sleduje, jak to obyvatel **Toník** odnese, a nakonec zapne ochranu a zkusí út
 
 | Oblast | Stav |
 |---|---|
-| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička zatím vektorová |
+| Izometrický dům – koupelna + obývák, nábytek, dekorace | ✅ 3D render z Blenderu (three.js), postavička jako živý 3D model s animacemi |
 | Konfigurátor (bojler, topení, osvětlení + 7 zařízení „již brzy") | ✅ karty i klepnutí přímo do scény, ukládání do localStorage |
 | Běžná vs. chytrá varianta zařízení | ✅ chytrá má displej, LED a odznak stavu |
 | Simulované útoky (8 útoků na 3 zařízení) | ✅ |
@@ -45,6 +45,21 @@ blender -b --factory-startup --python house.py -- <out_dir> final           # je
 ```
 
 Rozmístění v `house.py` odpovídá mřížce v `src/config/layout.ts` (1 dlaždice = 0,65 m).
+
+## Postavička Toník (Blender → three.js)
+
+Toník je 3D model `public/assets/character/avatar.glb`, který vytváří skript `tools/blender/avatar.py`
+(tvary, kostra a akce pro všechny pózy: `idle`, `walk`, `sit`, `sleep`, `blanket`, `read`, `warm`, `press`, `shower`, `dance`).
+Ve hře ho přehrává `src/game/scene/three/Avatar3D.ts` – přepíná animace podle pózy, natáčí postavu ve směru chůze,
+mění barvy (zima, horko, mokré vlasy, sprcha) a zapíná doplňky (deka, kniha, ručník, čepice).
+Výraz obličeje se kreslí do plátna (`src/game/scene/face.ts`), které je texturou na obličeji modelu.
+Za nábytek se postava schová sama díky hloubkové mapě podkladu.
+
+```bash
+cd tools/blender
+blender -b --factory-startup --python avatar.py -- ../../public/assets/character glb        # model do hry
+blender -b --factory-startup --python avatar.py -- <out_dir> preview [iso|side]            # .blend + náhled všech póz
+```
 
 ## Spuštění lokálně
 
