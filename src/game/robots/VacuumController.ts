@@ -63,6 +63,18 @@ export class VacuumController {
     return this.phase === 'docked';
   }
 
+  /** Okamžitě zpět do doku (zařízení bylo ze scény odebráno). */
+  reset() {
+    this.x = DOCK.x;
+    this.y = DOCK.y;
+    this.heading = -Math.PI / 2;
+    this.phase = 'docked';
+    this.dockT = DOCK_TIME * 0.6;
+    this.speed = 0;
+    this.approached = false;
+    this.attack = 'normal';
+  }
+
   update(dtMs: number, attack: VacuumAttack, smart: boolean, char: { x: number; y: number }) {
     const dt = Math.min(dtMs, 50) / 1000;
     if (attack !== this.attack) this.onAttack(attack);

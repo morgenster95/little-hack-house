@@ -32,13 +32,14 @@ export function attack(id: DeviceId, attackId: string) {
   bus.emit({ type: 'attack', device: id, attack: attackId });
 }
 
-function recover(id: DeviceId, toStatus: 'normal' | 'protected', delay = 1600) {
+/** Obnova zařízení; výsledný stav (chráněno / v pořádku) se určí až na konci – ochrana se mezitím mohla zapnout. */
+function recover(id: DeviceId, delay = 1600) {
   const s = store();
   const prev = recoverTimers.get(id);
   if (prev) clearTimeout(prev);
   s.setDevice(id, { status: 'recovering' });
   const t = window.setTimeout(() => {
-    store().setDevice(id, { status: toStatus, attack: null });
+    store().setDevice(id, { status: store().protection.active ? 'protected' : 'normal', attack: null });
     recoverTimers.delete(id);
     bus.emit({ type: 'restored', device: id });
   }, delay);
@@ -47,14 +48,14 @@ function recover(id: DeviceId, toStatus: 'normal' | 'protected', delay = 1600) {
 
 export function restore(id: DeviceId) {
   audio.play('restore');
-  recover(id, store().protection.active ? 'protected' : 'normal');
+  recover(id);
 }
 
 export function restoreAll() {
   const s = store();
   (Object.keys(s.devices) as DeviceId[]).forEach((id) => {
     const st = s.devices[id].status;
-    if (st === 'compromised' || st === 'disabled') recover(id, s.protection.active ? 'protected' : 'normal', 1200);
+    if (st === 'compromised' || st === 'disabled') recover(id, 1200);
   });
 }
 
@@ -66,7 +67,7 @@ export function setProtection(active: boolean) {
     if (!s.smart[id]) return;
     const st = s.devices[id].status;
     if (active) {
-      if (st === 'compromised' || st === 'disabled') recover(id, 'protected', 2200);
+      if (st === 'compromised' || st === 'disabled') recover(id, 2200);
       else if (st === 'normal') s.setDevice(id, { status: 'protected' });
     } else if (st === 'protected') {
       s.setDevice(id, { status: 'normal' });

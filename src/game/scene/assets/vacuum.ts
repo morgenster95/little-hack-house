@@ -1,7 +1,7 @@
 import { Graphics, Text } from 'pixi.js';
 import * as THREE from 'three';
 import { audio } from '../../engine/audio';
-import { VACUUM_R, VacuumAttack, VacuumController } from '../../robots/VacuumController';
+import { DOCK, VACUUM_R, VacuumAttack, VacuumController } from '../../robots/VacuumController';
 import { Particles } from '../effects';
 import { iso, isoHull, pts } from '../iso';
 import { P } from '../palette';
@@ -124,6 +124,8 @@ export class VacuumView extends DeviceView {
   private ledMat = glowMaterial(LED.normal);
   private face = new TopFace();
   private shadow = blobShadow(0.55, 0.35);
+  private dock = new THREE.Group();
+  protected optional = true;
   private fx = new Graphics();
   private particles = new Particles();
   private label: Text;
@@ -172,7 +174,16 @@ export class VacuumView extends DeviceView {
     this.brush.position.set(0.12, -0.12, 0.012);
     this.group.add(body, lid, bumper, screen, led, this.turret, this.brush);
     this.group.traverse((o) => (o.frustumCulled = false));
-    L.view.scene.add(this.group, this.shadow);
+
+    // nabíjecí dok u příčky
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.26 * 0.65, 0.6 * 0.65, 0.012), dark);
+    base.position.copy(at(4.85, DOCK.y, FLOOR_M + 0.006));
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(0.14 * 0.65, 0.46 * 0.65, 0.17), white);
+    tower.position.copy(at(4.77, DOCK.y, FLOOR_M + 0.085));
+    const dockLed = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.05, 0.012), this.ledMat);
+    dockLed.position.copy(at(4.84, DOCK.y, FLOOR_M + 0.128)).add(new THREE.Vector3(0.002, 0, 0));
+    this.dock.add(base, tower, dockLed);
+    L.view.scene.add(this.group, this.shadow, this.dock);
 
     this.label = new Text({ text: '', style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: '700', fill: 0xffffff } });
     this.label.resolution = 4;
@@ -184,6 +195,15 @@ export class VacuumView extends DeviceView {
     this.t = f.t;
     const attack: VacuumAttack = f.attacked ? ((f.attack as VacuumAttack) ?? 'normal') : 'normal';
     const c = this.ctl;
+    // vysavač nemá každý – bez zapnutí ve scéně vůbec není
+    this.group.visible = this.shadow.visible = this.dock.visible = this.smart;
+    if (!this.smart) {
+      c.reset();
+      this.fx.clear();
+      this.label.visible = false;
+      this.particles.update(f.dt);
+      return;
+    }
     c.update(f.dt, attack, this.smart, this.L.char);
 
     // 3D model

@@ -508,8 +508,7 @@ gbox('tv_stand', 8.4, 5.6, 8.8, 5.85, 0.48, 0.5, M['graphite'], C_DEV, r=0.005)
 gbox('tv_neck', 8.55, 5.72, 8.65, 5.78, 0.5, 0.62, M['graphite'], C_DEV, r=0.005)
 gbox('tv_panel', 7.75, 5.66, 9.45, 5.78, 0.58, 1.18, M['black'], C_DEV, r=0.01)
 gbox('tv_screen', 7.77, 5.655, 9.43, 5.665, 0.6, 1.16, M['screen'], C_DEV, r=0)
-cyl('speaker', 9.45, 5.75, 0.48, 0.66, 0.06, mat('speaker_fabric', '#5b5f66', 0.9, sheen=0.3), C_DEV, bev=0.015)
-cyl('speaker_ring', 9.45, 5.75, 0.66, 0.67, 0.05, M['led_blue'], C_DEV, bev=0.003)
+# hlasový asistent na skříňce je ve hře živý (jen když ho hráč zapne)
 cyl('tv_plant_pot', 7.75, 5.95, 0.48, 0.6, 0.06, M['pot_terra'], C_FURN, r2=0.05, bev=0.008)
 for i, (dx, dy, rx, ry) in enumerate([(-0.05, 0, 0.2, -0.4), (0.05, 0.02, -0.25, 0.4), (0, -0.04, 0.3, 0.0), (0.01, 0.05, -0.3, 0.1)]):
     ellipsoid(f'tv_plant_leaf_{i}', 7.75 + dx, 5.95 + dy, 0.7, 0.03, 0.03, 0.11, M['leaf2'], C_FURN, rot=(rx, ry, 0))
@@ -597,14 +596,8 @@ for i in range(11):
               rot=(0, tilt, -a), subdiv=3)
     cyl(f'big_stem_{i}', PLX + math.cos(a) * 0.05, PLY + math.sin(a) * 0.05, 0.48, h - 0.1, 0.006, M['leaf'], C_FURN, bev=0)
 
-# dokovací stanice robotického vysavače (vysavač i hlava kamery jsou ve hře živé 3D objekty)
-gbox('dock_base', 4.72, 4.7, 4.98, 5.3, FLOOR_Z, FLOOR_Z + 0.012, M['graphite'], C_DEV, r=0.003)
-gbox('dock', 4.7, 4.77, 4.84, 5.23, FLOOR_Z, FLOOR_Z + 0.17, M['white'], C_DEV, r=0.025)
-gbox('dock_led', 4.84, 4.96, 4.845, 5.04, FLOOR_Z + 0.12, FLOOR_Z + 0.135, M['led_blue'], C_DEV, r=0.001)
-
-# držák kamery v rohu
-gbox('cam_mount', 11.75, 0.0, 11.95, 0.06, 2.2, 2.3, M['white'], C_DEV, r=0.01)
-cyl('cam_arm', 11.85, 0.08, 2.24, 2.26, 0.018, M['white'], C_DEV, bev=0.004)
+# robotický vysavač s dokem a bezpečnostní kamera nejsou v podkladu – ve hře se objeví,
+# jen když je hráč zapne (src/game/scene/assets/vacuum.ts, camera.ts)
 
 # polička nad radiátorem
 gbox('wall_shelf', 5.0, 0.0, 6.5, 0.32, 1.72, 1.75, M['oak'], C_FURN, r=0.004)

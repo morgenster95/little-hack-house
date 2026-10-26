@@ -22,6 +22,8 @@ export class CameraView extends DeviceView {
   private tag = new Container();
   private tagG = new Graphics();
   private tagText: Text;
+  private mount = new THREE.Group();
+  protected optional = true;
 
   constructor(L: Layers, opts: DeviceViewOptions) {
     super('camera', L, [11.85, 0.2, zpx(2.75)], [11.4, 0.0, 12.0, 0.6], [isoHull(11.7, 0.0, zpx(2.08), 12.0, 0.42, zpx(2.36))], opts);
@@ -42,7 +44,14 @@ export class CameraView extends DeviceView {
     this.pivot.traverse((o) => (o.frustumCulled = false));
     this.aim.up.set(0, 0, 1);
     this.aim.position.copy(this.pivot.position);
-    L.view.scene.add(this.pivot);
+    // držák na stěně
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.2 * 0.65, 0.04, 0.1), white);
+    plate.position.copy(at(MOUNT.x, 0, 2.25)).setY(-0.02);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.075, 16), white);
+    arm.position.copy(at(MOUNT.x, 0, MOUNT.z)).setY(-0.055);
+    this.mount.add(plate, arm);
+    this.mount.traverse((o) => (o.frustumCulled = false));
+    L.view.scene.add(this.pivot, this.mount);
 
     this.tagText = new Text({ text: '', style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: '700', fill: 0xffffff } });
     this.tagText.resolution = 4;
@@ -55,6 +64,13 @@ export class CameraView extends DeviceView {
   protected draw(f: DeviceFrame) {
     const mode = f.attacked ? f.attack : 'normal';
     const m = this.L.char;
+    // kameru nemá každý – bez zapnutí ve scéně vůbec není
+    this.pivot.visible = this.mount.visible = this.smart;
+    if (!this.smart) {
+      this.cone.clear();
+      this.tag.visible = false;
+      return;
+    }
     let target: THREE.Vector3;
     if (mode === 'peek') target = at(m.x, m.y, FLOOR_M + 1.35);
     else if (mode === 'off') target = at(11.4, 0.5, 0.2);
