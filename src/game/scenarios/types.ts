@@ -4,7 +4,8 @@ import type { HeatMode, LightMode } from '../../stores/gameStore';
 import type { CharFlag, EmoteId, Expression, Facing, Pose } from '../character/CharacterController';
 import type { SfxName } from '../engine/audio';
 
-export type SceneFlag = 'showerHot' | 'showerCold' | 'tv' | 'windowOpen';
+/** doorHeld – postavička drží dveře zavřené; washing – pračka běží (běžné praní). */
+export type SceneFlag = 'showerHot' | 'showerCold' | 'tv' | 'windowOpen' | 'doorHeld' | 'washing';
 
 /**
  * API, přes které scénáře řídí postavičku a scénu.
@@ -30,6 +31,8 @@ export interface ScenarioContext {
   hotWater(): boolean;
   heating(): HeatMode;
   lights(): LightMode;
+  /** Aktivní útok na zařízení, nebo 'normal'. */
+  mode(id: DeviceId): string;
   isSmart(id: DeviceId): boolean;
 }
 

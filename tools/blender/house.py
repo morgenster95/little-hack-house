@@ -597,16 +597,14 @@ for i in range(11):
               rot=(0, tilt, -a), subdiv=3)
     cyl(f'big_stem_{i}', PLX + math.cos(a) * 0.05, PLY + math.sin(a) * 0.05, 0.48, h - 0.1, 0.006, M['leaf'], C_FURN, bev=0)
 
-# robotický vysavač (budoucí zařízení)
-cyl('robot', 5.45, 6.35, FLOOR_Z, FLOOR_Z + 0.09, 0.17, M['white'], C_DEV, bev=0.02)
-cyl('robot_top', 5.45, 6.35, FLOOR_Z + 0.09, FLOOR_Z + 0.1, 0.07, M['graphite'], C_DEV, bev=0.005)
-gbox('robot_led', 5.43, 6.04, 5.47, 6.06, FLOOR_Z + 0.06, FLOOR_Z + 0.075, M['led_blue'], C_DEV, r=0.002)
+# dokovací stanice robotického vysavače (vysavač i hlava kamery jsou ve hře živé 3D objekty)
+gbox('dock_base', 4.72, 4.7, 4.98, 5.3, FLOOR_Z, FLOOR_Z + 0.012, M['graphite'], C_DEV, r=0.003)
+gbox('dock', 4.7, 4.77, 4.84, 5.23, FLOOR_Z, FLOOR_Z + 0.17, M['white'], C_DEV, r=0.025)
+gbox('dock_led', 4.84, 4.96, 4.845, 5.04, FLOOR_Z + 0.12, FLOOR_Z + 0.135, M['led_blue'], C_DEV, r=0.001)
 
-# kamera v rohu (budoucí zařízení)
+# držák kamery v rohu
 gbox('cam_mount', 11.75, 0.0, 11.95, 0.06, 2.2, 2.3, M['white'], C_DEV, r=0.01)
-ellipsoid('cam_body', 11.85, 0.2, 2.2, 0.06, 0.09, 0.06, M['white'], C_DEV)
-cyl('cam_lens', 0, 0, 0, 0.02, 0.03, M['screen'], C_DEV, axis='Y', center=(11.85, 0.33, 2.19), bev=0.004)
-cyl('cam_led', 0, 0, 0, 0.005, 0.006, M['led_blue'], C_DEV, axis='Y', center=(11.92, 0.335, 2.23), bev=0)
+cyl('cam_arm', 11.85, 0.08, 2.24, 2.26, 0.018, M['white'], C_DEV, bev=0.004)
 
 # polička nad radiátorem
 gbox('wall_shelf', 5.0, 0.0, 6.5, 0.32, 1.72, 1.75, M['oak'], C_FURN, r=0.004)

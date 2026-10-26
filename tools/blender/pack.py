@@ -6,7 +6,7 @@ Z Blender exportu udělá herní assety:
 Použití: python -I pack.py <export_dir> <out_dir>
 """
 import json, os, sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 src, dst = sys.argv[1], sys.argv[2]
 os.makedirs(dst, exist_ok=True)
@@ -23,15 +23,20 @@ bx0, by0, bx1, by1 = color.getchannel('A').getbbox()
 x0, y0 = max(0, bx0 - pad), max(0, by0 - pad)
 x1, y1 = min(W, bx1 + pad), min(H, by1 + pad)
 
-alpha = color.getchannel('A').crop((x0, y0, x1, y1)).tobytes()
-depth = list(dimg.crop((x0, y0, x1, y1)).get_flattened_data())
-out = bytearray(len(depth) * 3)
-for i, d in enumerate(depth):
-    if alpha[i] == 0 or d == 0:
-        d = 65535  # prázdné pixely (i průhledy oknem) = nejdál
-    out[i * 3] = d >> 8
-    out[i * 3 + 1] = d & 255
-Image.frombytes('RGB', (x1 - x0, y1 - y0), bytes(out)).save(os.path.join(dst, 'scene_depth.png'), optimize=True)
+# 16bit hloubka → R (horní bajt) + G (dolní bajt); prázdné pixely (i průhledy oknem) = nejdál
+alpha = color.getchannel('A').crop((x0, y0, x1, y1))
+raw = dimg.crop((x0, y0, x1, y1)).tobytes('raw', 'I;16')
+size = (x1 - x0, y1 - y0)
+hi = Image.frombytes('L', size, raw[1::2])
+lo = Image.frombytes('L', size, raw[0::2])
+empty = ImageChops.lighter(
+    alpha.point(lambda v: 255 if v == 0 else 0),
+    ImageChops.lighter(hi, lo).point(lambda v: 255 if v == 0 else 0),
+)
+full = Image.new('L', size, 255)
+hi = Image.composite(full, hi, empty)
+lo = Image.composite(full, lo, empty)
+Image.merge('RGB', (hi, lo, Image.new('L', size, 0))).save(os.path.join(dst, 'scene_depth.png'), optimize=True)
 
 crop = color.crop((x0, y0, x1, y1))
 crop.save(os.path.join(dst, 'scene.webp'), quality=90, method=6)

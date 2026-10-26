@@ -1,5 +1,7 @@
 import { Container, Graphics, Polygon } from 'pixi.js';
 import type { DeviceId, DeviceStatus } from '../../../config/devices';
+import type { CharacterModel } from '../../character/CharacterController';
+import type { SceneFlag } from '../../scenarios/types';
 import { iso, isoHull, pts, quadY } from '../iso';
 import { P } from '../palette';
 import { zpx } from '../space';
@@ -12,6 +14,10 @@ export interface Layers {
   /** neviditelné oblasti pro klepnutí na zařízení */
   hit: Container;
   view: View3D;
+  /** postava – zařízení na ni můžou reagovat (vysavač ji honí, kamera ji sleduje) */
+  char: CharacterModel;
+  /** příznaky scény nastavované scénáři */
+  flags: Set<SceneFlag>;
 }
 
 export interface DeviceFrame {
@@ -44,14 +50,14 @@ export abstract class DeviceView {
   private shieldFx = new Graphics();
   private blockT = -1;
   private popT = -1;
-  private badgeAnchor: { x: number; y: number };
+  protected badgeAnchor: { x: number; y: number };
   private hits: Container[] = [];
 
   constructor(
     public id: DeviceId,
     protected L: Layers,
     badgePos: [number, number, number],
-    private footprint: [number, number, number, number],
+    protected footprint: [number, number, number, number],
     hitAreas: number[][],
     protected opts: DeviceViewOptions,
   ) {
@@ -73,6 +79,13 @@ export abstract class DeviceView {
       L.hit.addChild(node);
       this.hits.push(node);
     }
+  }
+
+  /** Pro pohyblivá zařízení: nové oblasti pro klepnutí (izometrické px). */
+  protected setHitAreas(areas: number[][]) {
+    this.hits.forEach((n, i) => {
+      if (areas[i]) n.hitArea = new Polygon(areas[i]);
+    });
   }
 
   protected onSmartChange(smart: boolean) {

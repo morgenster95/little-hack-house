@@ -74,6 +74,8 @@ export class GameEngine {
       this.renderer.playBlocked(e.device);
     } else if (e.type === 'restored') {
       if (e.device === 'heating' && deviceLogic.heating() !== 'max') this.sceneFlags.delete('windowOpen');
+      // úleva jen tehdy, když už není napadené nic jiného (jinak by přerušila reakci na další útok)
+      if (deviceLogic.anyAttack()) return;
       if (this.current?.kind === 'reaction' || (this.current?.kind === 'idle' && this.current.scenario.idle?.when)) {
         if (this.queued?.kind !== 'relief') this.interrupt(reliefScenario, 'relief');
       }
@@ -121,6 +123,7 @@ export class GameEngine {
       hotWater: () => deviceLogic.hotWater(),
       heating: () => deviceLogic.heating(),
       lights: () => deviceLogic.lights(),
+      mode: (id) => deviceLogic.mode(id),
       isSmart: (id) => store().smart[id],
     };
   }
@@ -135,6 +138,8 @@ export class GameEngine {
     this.sceneFlags.delete('showerHot');
     this.sceneFlags.delete('showerCold');
     this.sceneFlags.delete('tv');
+    this.sceneFlags.delete('doorHeld');
+    this.sceneFlags.delete('washing');
     if (deviceLogic.heating() !== 'max') this.sceneFlags.delete('windowOpen');
     if (deviceLogic.lights() === 'off') m.flags.add('flashlight');
     if (deviceLogic.heating() === 'off') m.flags.add('shiver');
@@ -160,8 +165,7 @@ export class GameEngine {
         await next.scenario.run(ctx, next.info);
         if (next.kind === 'idle') {
           const s = useGameStore.getState();
-          const anyAttack = deviceLogic.heating() !== 'normal' || deviceLogic.lights() !== 'normal' || !deviceLogic.hotWater();
-          if (!anyAttack && s.comfort < 90) s.addComfort(4);
+          if (!deviceLogic.anyAttack() && s.comfort < 90) s.addComfort(4);
         }
         await sleep(500, ac.signal);
       } catch (err) {

@@ -2,12 +2,13 @@ import type { DeviceId } from '../../config/devices';
 import { BRAND } from '../../config/brand';
 import { boilerShower } from './boilerShower';
 import { heatingMax, heatingOff } from './heating';
+import { homeReactions } from './home';
 import { idleActivities } from './idle';
 import { lightsFlicker, lightsOff, lightsParty } from './lights';
 import type { Scenario } from './types';
 
 /** Registr scénářů. Nový příběh = nový soubor + přidání sem. */
-export const reactionScenarios: Scenario[] = [boilerShower, heatingOff, heatingMax, lightsFlicker, lightsOff, lightsParty];
+export const reactionScenarios: Scenario[] = [boilerShower, heatingOff, heatingMax, lightsFlicker, lightsOff, lightsParty, ...homeReactions];
 export { idleActivities };
 
 export function findReaction(device: DeviceId, attack: string): Scenario | undefined {

@@ -4,7 +4,12 @@ import { GRID } from '../../config/layout';
 import { isAttacked, useGameStore } from '../../stores/gameStore';
 import type { CharacterController } from '../character/CharacterController';
 import type { SceneFlag } from '../scenarios/types';
+import { CameraView } from './assets/camera';
 import { BoilerView, DeviceView, HeatingView, houseOutline, Layers, LightsView } from './assets/devices';
+import { LockView } from './assets/lock';
+import { SpeakerView, TvView } from './assets/media';
+import { VacuumView } from './assets/vacuum';
+import { WasherView } from './assets/washer';
 import { CharacterView } from './CharacterView';
 import { Particles } from './effects';
 import { iso, pts } from './iso';
@@ -92,11 +97,17 @@ export class SceneRenderer {
     this.app.stage.addChild(this.camera);
 
     this.buildSceneFx();
-    const layers: Layers = { glow: this.glow, fx: this.fx, hit: this.hit, view: this.view3d };
+    const layers: Layers = { glow: this.glow, fx: this.fx, hit: this.hit, view: this.view3d, char: this.host.char.model, flags: this.host.sceneFlags };
     const opts = { onTap: (id: DeviceId) => this.host.onDeviceTap(id), canTap: () => this.dragDist < 8 };
     this.devices.boiler = new BoilerView(layers, opts);
     this.devices.heating = new HeatingView(layers, opts);
     this.devices.lights = new LightsView(layers, opts);
+    this.devices.vacuum = new VacuumView(layers, opts);
+    this.devices.tv = new TvView(layers, opts);
+    this.devices.speaker = new SpeakerView(layers, opts);
+    this.devices.camera = new CameraView(layers, opts);
+    this.devices.washer = new WasherView(layers, opts);
+    this.devices.lock = new LockView(layers, opts);
 
     this.fx.addChild(this.charView.fx);
     this.effects.addChild(this.shower.g);

@@ -8,8 +8,8 @@ preview – navíc avatar.blend a náhledy všech póz (avatar_poses.png) [iso|s
 Postava stojí v počátku, kouká do -Y (= +gy v herní mřížce), 1 jednotka = 1 m, nula = podlaha.
 Díly jsou tuhé a visí na kostech (hračkový styl, žádné vážení vrcholů).
 Obličej (oči, pusa, tvářičky) je rovina „face“ s UV – hra na ni kreslí výraz z plátna.
-Pózy jsou akce: idle, walk, sit, sleep, blanket, read, warm, press, shower, dance.
-Doplňky blanket / book / towel / shower_cap hra zobrazuje jen v příslušné póze.
+Pózy jsou akce: idle, walk, sit, sleep, blanket, read, warm, press, shower, dance, slip, ears, tuck, phone.
+Doplňky blanket / book / towel / shower_cap / phone hra zobrazuje jen v příslušné póze.
 """
 import bpy, bmesh, math, os, sys
 from mathutils import Vector, Matrix, Euler
@@ -63,6 +63,8 @@ M = {
     'paper': mat('paper', '#fff2dc', 0.8),
     'towel': mat('towel', '#ffffff', 0.9, sheen=0.4),
     'cap': mat('cap', '#f7a8c4', 0.5),
+    'phone': mat('phone', '#2b2f36', 0.4),
+    'phone_screen': mat('phone_screen', '#9fd8ff', 0.3),
 }
 
 
@@ -248,6 +250,9 @@ part(rbox('blanket', (0, 0.01, 0.9), (0.42, 0.29, 0.54), 0.13, M['blanket']), 'p
 part(rbox('blanket_lap', (0, -0.16, 0.715), (0.41, 0.40, 0.21), 0.1, M['blanket']), 'pelvis')
 part(capsule('blanket_roll', (-0.19, 0.0, 1.13), (0.19, 0.0, 1.13), 0.07, M['blanket']), 'pelvis')
 part(rbox('towel', (0, 0, 0.655), (0.315, 0.22, 0.19), 0.07, M['towel']), 'pelvis')
+# mobil v pravé dlani (displej ke tváři, když ruku zvedne)
+part(rbox('phone', (-(WR_X - 0.01), -0.05, 0.655), (0.014, 0.078, 0.15), 0.006, M['phone']), 'hand.R')
+part(rbox('phone_screen', (-(WR_X - 0.019), -0.05, 0.655), (0.004, 0.066, 0.13), 0.002, M['phone_screen']), 'hand.R')
 part(ellipsoid('shower_cap', (0, 0.006, HC + 0.055), (HX + 0.03, HY + 0.03, HZ * 0.78), M['cap'], subdiv=4), 'head')
 
 # ================================================================ KOSTRA
@@ -503,13 +508,67 @@ def p_dance(p):
     ground()
 
 
+def p_slip(p):
+    # uklouzl a sedí na zemi, opírá se o ruce
+    for sd, s in SIDES:
+        fwd(f'thigh.{sd}', 1.45)
+        rot(f'thigh.{sd}', 'Y', -s * 0.18)
+        fwd(f'shin.{sd}', -0.1)
+        fwd(f'upper_arm.{sd}', -0.55)
+        abduct(sd, s, 0.35)
+        fwd(f'forearm.{sd}', 0.1)
+    fwd('spine', -0.3)
+    fwd('head', 0.15)
+    rot('head', 'Y', 0.12 * math.sin(p))
+    lift(0.075 - 0.70)
+
+
+def p_ears(p):
+    # zakrývá si uši a vrtí hlavou
+    fwd('spine', 0.06)
+    for sd, s in SIDES:
+        abduct(sd, s, 1.4)
+        fwd(f'upper_arm.{sd}', 0.3)
+        rot(f'forearm.{sd}', 'Y', -s * 2.6)
+    rot('head', 'Z', 0.18 * math.sin(p))
+    ground()
+
+
+def p_tuck(p):
+    # na gauči s koleny u brady
+    sit_base()
+    for sd, s in SIDES:
+        fwd(f'thigh.{sd}', 2.35 - SIT_THIGH)
+        fwd(f'shin.{sd}', -(2.35 - SIT_THIGH) - 0.25)
+        fwd(f'upper_arm.{sd}', 0.85)
+        fwd(f'forearm.{sd}', 0.95)
+        abduct(sd, s, -0.05)
+    fwd('spine', 0.18 + 0.015 * math.sin(p))
+    fwd('head', -0.05)
+
+
+def p_phone(p):
+    # kouká do mobilu v pravé ruce, levou má volně
+    fwd('upper_arm.R', 0.35)
+    fwd('forearm.R', 1.35)
+    abduct('R', -1, -0.22)
+    rot('hand.R', 'Z', -0.6)
+    fwd('upper_arm.L', 0.05)
+    fwd('forearm.L', 0.2)
+    abduct('L', 1, 0.05)
+    fwd('neck', 0.15)
+    fwd('head', 0.25 + 0.03 * math.sin(p))
+    ground()
+
+
 # jméno: (funkce, snímků cyklu)
 ANIMS = {
     'idle': (p_idle, 72), 'walk': (p_walk, 24),
     'sit': (p_sit, 96), 'sleep': (p_sleep, 120), 'blanket': (p_blanket, 72), 'read': (p_read, 96),
     'warm': (p_warm, 36), 'press': (p_press, 24), 'shower': (p_shower, 30), 'dance': (p_dance, 24),
+    'slip': (p_slip, 48), 'ears': (p_ears, 24), 'tuck': (p_tuck, 96), 'phone': (p_phone, 72),
 }
-KEY_EVERY = {'walk': 1, 'dance': 1, 'press': 2, 'shower': 2, 'warm': 3}
+KEY_EVERY = {'walk': 1, 'dance': 1, 'press': 2, 'shower': 2, 'warm': 3, 'ears': 2, 'slip': 4}
 
 
 def pose(name, i, n):
@@ -582,7 +641,7 @@ if MODE == 'preview':
     scene.render.resolution_x, scene.render.resolution_y = 320, 400
     scene.view_settings.view_transform = 'AgX'
     PROPS = {'blanket': ('blanket', 'blanket_lap', 'blanket_roll'), 'read': ('book', 'book_pages'),
-             'shower': ('towel', 'shower_cap')}
+             'shower': ('towel', 'shower_cap'), 'phone': ('phone', 'phone_screen')}
     allprops = [n for v in PROPS.values() for n in v]
     tiles = []
     arm.rotation_euler.z = math.radians(25) if VIEW == 'iso' else 0
@@ -599,6 +658,8 @@ if MODE == 'preview':
         tiles.append(px.reshape(400, 320, 4))
         bpy.data.images.remove(img)
         os.remove(path)
+    while len(tiles) % 5:
+        tiles.append(np.zeros_like(tiles[0]))
     rows = [np.concatenate(tiles[i:i + 5], axis=1) for i in range(0, len(tiles), 5)]
     sheet = np.concatenate(rows[::-1], axis=0)
     out = bpy.data.images.new('poses', sheet.shape[1], sheet.shape[0], alpha=True)

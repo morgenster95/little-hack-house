@@ -15,7 +15,21 @@ export type SfxName =
   | 'angry'
   | 'relief'
   | 'pop'
-  | 'restore';
+  | 'restore'
+  | 'vacuum'
+  | 'bump'
+  | 'blare'
+  | 'static'
+  | 'jingle'
+  | 'data'
+  | 'rumble'
+  | 'splash'
+  | 'slip'
+  | 'chime'
+  | 'laugh'
+  | 'creak'
+  | 'beep'
+  | 'buzz';
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -62,9 +76,9 @@ class AudioEngine {
     o.stop(t + dur + 0.05);
   }
 
-  private noise(dur: number, freq: number, vol = 0.15, q = 1) {
+  private noise(dur: number, freq: number, vol = 0.15, q = 1, delay = 0) {
     if (!this.ctx || !this.master || !this.noiseBuf) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuf;
     src.loop = true;
@@ -75,7 +89,7 @@ class AudioEngine {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.08);
-    g.gain.setValueAtTime(vol, t + dur - 0.3);
+    g.gain.setValueAtTime(vol, t + Math.max(0.09, dur - 0.3));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f).connect(g).connect(this.master);
     src.start(t);
@@ -125,6 +139,58 @@ class AudioEngine {
       case 'relief':
         this.tone(392, 0.2, { vol: 0.12 });
         this.tone(523, 0.35, { vol: 0.12, delay: 0.12 });
+        break;
+      case 'vacuum':
+        this.noise(1.6, 900, 0.05, 0.8);
+        this.tone(140, 1.5, { type: 'sawtooth', vol: 0.025, slide: 1.3 });
+        break;
+      case 'bump':
+        this.tone(130, 0.14, { type: 'triangle', vol: 0.22, slide: 0.6 });
+        this.noise(0.18, 400, 0.08, 1.5);
+        break;
+      case 'blare':
+        [220, 277, 330, 440].forEach((f, i) => this.tone(f, 1.1, { type: 'sawtooth', vol: 0.05, delay: i * 0.01 }));
+        this.noise(1.1, 1800, 0.06, 0.5);
+        break;
+      case 'static':
+        this.noise(0.9, 4200, 0.07, 0.3);
+        break;
+      case 'jingle':
+        [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.12, { type: 'square', vol: 0.045, delay: i * 0.09 }));
+        break;
+      case 'data':
+        for (let i = 0; i < 8; i++) this.tone(1200 + Math.random() * 1400, 0.04, { type: 'square', vol: 0.03, delay: i * 0.06 });
+        break;
+      case 'rumble':
+        this.noise(2.4, 160, 0.14, 2);
+        this.tone(55, 2.3, { type: 'sawtooth', vol: 0.04 });
+        break;
+      case 'splash':
+        this.noise(0.9, 1800, 0.12, 0.7);
+        this.tone(500, 0.3, { vol: 0.06, slide: 0.4 });
+        break;
+      case 'slip':
+        this.tone(620, 0.28, { type: 'triangle', vol: 0.14, slide: 0.25 });
+        this.tone(85, 0.22, { type: 'sine', vol: 0.3, delay: 0.3, slide: 0.7 });
+        this.noise(0.2, 300, 0.1, 1.2, 0.3);
+        break;
+      case 'chime':
+        this.tone(880, 0.18, { vol: 0.1 });
+        this.tone(1320, 0.3, { vol: 0.08, delay: 0.1 });
+        break;
+      case 'laugh':
+        for (let i = 0; i < 5; i++) this.tone(320 - i * 22, 0.16, { type: 'triangle', vol: 0.11, delay: i * 0.2, slide: 0.85 });
+        break;
+      case 'creak':
+        this.tone(95, 0.9, { type: 'sawtooth', vol: 0.04, slide: 1.6 });
+        this.noise(0.9, 700, 0.03, 4);
+        break;
+      case 'beep':
+        this.tone(1800, 0.06, { type: 'square', vol: 0.05 });
+        this.tone(1800, 0.06, { type: 'square', vol: 0.05, delay: 0.1 });
+        break;
+      case 'buzz':
+        this.tone(140, 0.35, { type: 'square', vol: 0.06 });
         break;
     }
   }

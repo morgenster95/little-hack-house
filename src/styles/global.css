@@ -613,6 +613,39 @@ h3 {
   color: #ffd08a;
 }
 
+/* desktop: zařízení ve dvou sloupcích, ať se panel vejde i s devíti zařízeními */
+@media (min-width: 900px) {
+  .dev-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dev-chip {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 8px;
+    row-gap: 3px;
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+
+  .dev-chip .dc-icon {
+    grid-row: span 2;
+    font-size: 20px;
+  }
+
+  .dev-chip .dev-name {
+    font-size: 13px;
+    line-height: 1.15;
+  }
+
+  .dev-chip .pill {
+    justify-self: start;
+    font-size: 10.5px;
+    padding: 2px 7px;
+  }
+}
+
 .attack-box {
   background: #1f1929;
   border-radius: 18px;
@@ -1105,6 +1138,7 @@ h3 {
 
   .dev-list {
     flex-direction: row;
+    flex-shrink: 0;
     overflow-x: auto;
     gap: 6px;
     margin: 0 -16px;

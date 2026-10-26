@@ -4,7 +4,7 @@ import { EmoteBubble, Particles, SpeechBubble } from './effects';
 import { iso } from './iso';
 import { FLOOR_M, zpx } from './space';
 
-const SEATED = new Set(['sit', 'sleep', 'blanket', 'read']);
+const SEATED = new Set(['sit', 'sleep', 'blanket', 'read', 'tuck']);
 
 /** Efekty kolem postavičky jsou kreslené v původních jednotkách; v novém domě jsou o čtvrtinu větší. */
 export const CHAR_SCALE = 1.25;
@@ -30,7 +30,7 @@ export class CharacterView {
     const p = iso(m.x, m.y, zpx(FLOOR_M));
     const seated = SEATED.has(m.pose);
     // 3D postava v sedu klesne asi o 0,2 m
-    const seat = seated ? 10 : 0;
+    const seat = seated ? 10 : m.pose === 'slip' ? 40 : 0;
     let hop = 0;
     if (m.hopStart >= 0) {
       const k = Math.min(1, (now - m.hopStart) / 450);

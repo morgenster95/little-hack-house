@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PX_PER_M } from '../space';
 import { Avatar3D } from './Avatar3D';
 import { Props3D } from './props';
+import { setToonLight } from './toon';
 
 THREE.ColorManagement.enabled = false;
 
@@ -173,6 +174,7 @@ export class View3D {
     this.ambient.intensity = 0.8 * light;
     this.sun.intensity = 0.9 * light;
     this.avatar.setLight(light);
+    setToonLight(light);
   }
 
   render() {

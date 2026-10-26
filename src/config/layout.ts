@@ -27,7 +27,10 @@ export type WaypointId =
   | 'armchair'
   | 'livingMid'
   | 'front'
-  | 'plant';
+  | 'plant'
+  | 'washer'
+  | 'entry'
+  | 'tvFront';
 
 export const WAYPOINTS: Record<WaypointId, { x: number; y: number }> = {
   shower: { x: 0.9, y: 0.9 },
@@ -47,6 +50,9 @@ export const WAYPOINTS: Record<WaypointId, { x: number; y: number }> = {
   livingMid: { x: 6.3, y: 4.2 },
   front: { x: 9.0, y: 4.55 },
   plant: { x: 11.0, y: 5.7 },
+  washer: { x: 1.55, y: 3.55 },
+  entry: { x: 6.0, y: 6.45 },
+  tvFront: { x: 8.6, y: 4.8 },
 };
 
 export const EDGES: [WaypointId, WaypointId][] = [
@@ -67,4 +73,9 @@ export const EDGES: [WaypointId, WaypointId][] = [
   ['armchairFront', 'armchair'],
   ['front', 'plant'],
   ['armchairFront', 'window'],
+  ['washer', 'bathCenter'],
+  ['washer', 'bathMat'],
+  ['entry', 'livingMid'],
+  ['tvFront', 'front'],
+  ['tvFront', 'livingMid'],
 ];
