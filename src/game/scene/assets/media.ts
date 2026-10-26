@@ -26,7 +26,7 @@ class Tag {
   private text: Text;
 
   constructor(size = 10) {
-    this.text = new Text({ text: '', style: { fontFamily: 'Nunito, sans-serif', fontSize: size, fontWeight: '900', fill: 0xffffff } });
+    this.text = new Text({ text: '', style: { fontFamily: 'Inter, sans-serif', fontSize: size, fontWeight: '900', fill: 0xffffff } });
     this.text.resolution = 4;
     this.text.anchor.set(0.5);
     this.container.addChild(this.g, this.text);
