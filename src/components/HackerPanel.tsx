@@ -3,6 +3,7 @@ import { DEVICE_MAP, DEVICES, DeviceStatus } from '../config/devices';
 import { OUTCOMES } from '../config/outcomes';
 import { attack, enterConfig, restore, selectDevice, setProtection } from '../game/interactions/actions';
 import { isAttacked, useGameStore } from '../stores/gameStore';
+import { Icon } from './Icon';
 
 const STATUS_LABEL: Record<DeviceStatus, string> = {
   normal: 'v pořádku',
@@ -40,7 +41,9 @@ export function HackerPanel() {
               className={`dev-chip ${selectedDevice === d.id ? 'sel' : ''} st-${attacked ? 'hacked' : rt.status}`}
               onClick={() => selectDevice(selectedDevice === d.id ? null : d.id)}
             >
-              <span className="dc-icon">{d.icon}</span>
+              <span className="dc-icon">
+                <Icon name={d.id} size={18} />
+              </span>
               <span className="dev-name">{d.name}</span>
               <span className="pill">{STATUS_LABEL[rt.status]}</span>
             </button>
@@ -67,18 +70,24 @@ export function HackerPanel() {
           </div>
           {selAttacked && (
             <button className="btn btn-ghost restore" onClick={() => restore(sel.id)}>
-              ↺ Obnovit zařízení
+              <Icon name="restore" size={16} /> Obnovit zařízení
             </button>
           )}
         </div>
       )}
 
-      {!sel && <div className="hint-box">👆 Klepni na zařízení s ikonkou wifi přímo v domě.</div>}
+      {!sel && (
+        <div className="hint-box">
+          <Icon name="info" size={16} /> Vyber zařízení v seznamu nebo klepni na jeho ikonu přímo v domě.
+        </div>
+      )}
 
       {protection.unlocked && (
         <div className={`protect-card ${protection.active ? 'active' : 'pulse'}`}>
           <div className="protect-top">
-            <span className="shield">🛡️</span>
+            <span className="shield">
+              <Icon name="shieldCheck" size={22} />
+            </span>
             <div>
               <div className="protect-name">{BRAND.productName}</div>
               <div className="small">{protection.active ? 'Ochrana aktivní – zkus útok zopakovat.' : 'Zjisti, jak by to dopadlo s ochranou.'}</div>

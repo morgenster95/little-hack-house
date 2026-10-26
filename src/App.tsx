@@ -29,7 +29,15 @@ export default function App() {
       if (!r) return;
       const el = panelRef.current;
       const top = 64;
-      if (!el || phase === 'intro') {
+      if (phase === 'intro') {
+        // úvod: text vlevo (desktop) / dole (mobil), živá scéna v uvolněném prostoru
+        const intro = document.querySelector('.intro-panel');
+        const ir = intro?.getBoundingClientRect();
+        if (window.innerWidth >= DESKTOP) r.setInsets({ top, right: 24, bottom: 24, left: ir ? ir.right + 8 : 0 });
+        else r.setInsets({ top: 58, right: 0, bottom: ir ? Math.max(0, window.innerHeight - ir.top) : 0, left: 0 });
+        return;
+      }
+      if (!el) {
         r.setInsets({ top, right: 0, bottom: 0, left: 0 });
         return;
       }

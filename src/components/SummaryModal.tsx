@@ -3,6 +3,7 @@ import { DEVICES } from '../config/devices';
 import { OUTCOMES } from '../config/outcomes';
 import { enterConfig, restoreAll } from '../game/interactions/actions';
 import { useGameStore } from '../stores/gameStore';
+import { Icon } from './Icon';
 
 export function SummaryModal() {
   const { smart, stats, setSummaryOpen, pushToast, resetRun } = useGameStore();
@@ -27,7 +28,7 @@ export function SummaryModal() {
     <div className="modal-backdrop" onClick={() => setSummaryOpen(false)}>
       <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Vyhodnocení">
         <button className="modal-close" onClick={() => setSummaryOpen(false)} aria-label="Zavřít">
-          ×
+          <Icon name="close" size={18} />
         </button>
         <div className="eyebrow">Vyhodnocení</div>
         <h2>Tvoje chytrá domácnost</h2>
@@ -80,7 +81,9 @@ export function SummaryModal() {
         <ul className="risks">
           {selected.map((d) => (
             <li key={d.id}>
-              <span>{d.icon}</span>
+              <span className="risk-icon">
+                <Icon name={d.id} size={20} />
+              </span>
               <div>
                 <b>{d.name}</b>
                 <p>{d.risk}</p>
@@ -91,7 +94,9 @@ export function SummaryModal() {
 
         <div className="cta">
           <div>
-            <b>🛡️ {BRAND.productName}</b>
+            <b>
+              <Icon name="shieldCheck" size={20} /> {BRAND.productName}
+            </b>
             <p>{BRAND.productTagline}</p>
           </div>
           <a className="btn btn-green" href={BRAND.productUrl} target="_blank" rel="noopener">
@@ -101,7 +106,7 @@ export function SummaryModal() {
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={share}>
-            Sdílet výsledek
+            <Icon name="share" size={16} /> Sdílet výsledek
           </button>
           <button
             className="btn btn-ghost"

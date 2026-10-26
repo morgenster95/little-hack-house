@@ -33,10 +33,10 @@ export const P = {
   cloud: 0xffffff,
   curtain: 0xf0a6a0,
   screenOff: 0x3d3a4b,
-  smart: 0x3fbfae,
+  smart: 0x2563eb,
   danger: 0xff5d7a,
-  hack: 0x9b5cff,
-  protect: 0x3ccf8e,
+  hack: 0x7c4dff,
+  protect: 0x10b981,
   warn: 0xffb347,
   outline: 0x5b4335,
 };

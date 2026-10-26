@@ -2,6 +2,7 @@ import { DEVICES } from '../config/devices';
 import { audio } from '../game/engine/audio';
 import { toggleSmart } from '../game/interactions/actions';
 import { useGameStore } from '../stores/gameStore';
+import { Icon } from './Icon';
 
 export function ConfigPanel() {
   const smart = useGameStore((s) => s.smart);
@@ -27,7 +28,9 @@ export function ConfigPanel() {
               disabled={!d.available}
               aria-pressed={on}
             >
-              <span className="dc-icon">{d.icon}</span>
+              <span className="dc-icon">
+                <Icon name={d.id} size={20} />
+              </span>
               <span className="dc-text">
                 <span className="dc-name">{d.name}</span>
                 <span className="dc-room">{d.available ? d.room : 'Již brzy'}</span>
@@ -50,7 +53,7 @@ export function ConfigPanel() {
             setPhase('play');
           }}
         >
-          Převzít kontrolu 💻
+          Převzít kontrolu <Icon name="arrow" size={16} stroke={2.2} />
         </button>
       </div>
     </div>

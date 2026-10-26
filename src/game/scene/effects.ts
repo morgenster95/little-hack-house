@@ -84,7 +84,7 @@ export class EmoteBubble {
   private glyph: Text;
 
   constructor() {
-    this.glyph = new Text({ text: '', style: { fontFamily: 'Fredoka, sans-serif', fontSize: 18, fontWeight: '700', fill: P.outline } });
+    this.glyph = new Text({ text: '', style: { fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: '700', fill: P.outline } });
     this.glyph.resolution = 4;
     this.glyph.anchor.set(0.5);
     this.container.addChild(this.g, this.icon, this.glyph);
@@ -189,7 +189,7 @@ export class SpeechBubble {
   constructor() {
     this.text = new Text({
       text: '',
-      style: { fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: '800', fill: P.outline, align: 'center' },
+      style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: P.outline, align: 'center' },
     });
     this.text.resolution = 4;
     this.text.anchor.set(0.5);

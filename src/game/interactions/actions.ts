@@ -18,7 +18,7 @@ export function attack(id: DeviceId, attackId: string) {
   if (s.protection.active) {
     s.countBlocked();
     s.addOutcome('blocked');
-    s.pushToast(`🛡️ ${BRAND.blockedMessage}: ${def.name.toLowerCase()}`, 'blocked');
+    s.pushToast(`${BRAND.blockedMessage}: ${def.name.toLowerCase()}`, 'blocked');
     audio.play('blocked');
     bus.emit({ type: 'blocked', device: id, attack: attackId });
     return;
@@ -26,7 +26,7 @@ export function attack(id: DeviceId, attackId: string) {
 
   s.countAttack(id);
   s.setDevice(id, { status: atk.resultStatus, attack: attackId });
-  s.pushToast(`💻 ${atk.label} – ${def.name.toLowerCase()} napaden`, 'attack');
+  s.pushToast(`Útok: ${atk.label} (${def.name.toLowerCase()})`, 'attack');
   audio.play('attack');
   if (!s.protection.unlocked) setTimeout(() => store().setProtection({ unlocked: true }), 2500);
   bus.emit({ type: 'attack', device: id, attack: attackId });
@@ -75,7 +75,7 @@ export function setProtection(active: boolean) {
   });
   if (active) {
     audio.play('shield');
-    s.pushToast(`🛡️ ${BRAND.productName} je aktivní`, 'good');
+    s.pushToast(`${BRAND.productName} je aktivní`, 'good');
   } else {
     s.pushToast('Ochrana vypnuta – zkus útok znovu', 'info');
   }
