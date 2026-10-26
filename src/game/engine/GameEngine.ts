@@ -132,7 +132,8 @@ export class GameEngine {
     const m = this.char.model;
     m.pose = 'stand';
     m.expression = 'neutral';
-    const keepWet = m.flags.has('wet');
+    // mokrý zůstane jen, dokud trvá útok s vodou (vytopení / studená sprcha), jinak by kapal napořád
+    const keepWet = m.flags.has('wet') && (deviceLogic.mode('washer') === 'flood' || !deviceLogic.hotWater());
     m.flags.clear();
     if (keepWet) m.flags.add('wet');
     this.sceneFlags.delete('showerHot');
