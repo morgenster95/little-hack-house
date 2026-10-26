@@ -26,12 +26,13 @@ export class LockView extends DeviceView {
   private particles = new Particles();
   private breeze = new Graphics();
   private leafT = 0;
+  private smartParts: THREE.Object3D[] = [];
 
   constructor(L: Layers, opts: DeviceViewOptions) {
     super(
       'lock',
       L,
-      [6.0, 7.15, zpx(0.95)],
+      [6.78, 7.3, zpx(0.75)],
       [5.3, 6.9, 6.7, 7.4],
       [isoHull(5.4, 6.95, 0, 6.6, 7.35, zpx(0.45)), isoHull(6.65, 7.28, zpx(0.15), 6.9, 7.34, zpx(0.4))],
       opts,
@@ -44,14 +45,15 @@ export class LockView extends DeviceView {
     leaf.position.set(w / 2, 0, DOOR.h / 2);
     const top = new THREE.Mesh(new THREE.BoxGeometry(w - 0.01, 0.047, 0.012), edge);
     top.position.set(w / 2, 0, DOOR.h - 0.006);
-    // chytrý zámek + klika na vnitřní straně
-    const lockBox = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.09), dark);
-    lockBox.position.set(w - 0.09, 0.035, DOOR.h * 0.55);
-    const led = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), this.ledMat);
-    led.position.set(w - 0.09, 0.052, DOOR.h * 0.55 + 0.025);
+    // klika a (u chytré verze) zámek s LED na venkovní straně, ať je k divákovi
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.015, 0.015), dark);
     handle.position.set(w - 0.08, -0.035, DOOR.h * 0.5);
-    this.hinge.add(leaf, top, lockBox, led, handle);
+    const lockBox = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.1), dark);
+    lockBox.position.set(w - 0.07, -0.035, DOOR.h * 0.72);
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.007, 10, 8), this.ledMat);
+    led.position.set(w - 0.07, -0.052, DOOR.h * 0.72 + 0.03);
+    this.smartParts.push(lockBox, led);
+    this.hinge.add(leaf, top, handle, lockBox, led);
     this.hinge.position.copy(at(DOOR.x0 + 0.01, DOOR.y, FLOOR_M));
     this.hinge.traverse((o) => (o.frustumCulled = false));
 
@@ -59,6 +61,7 @@ export class LockView extends DeviceView {
     // rovina natočená ven z domu (normála −Y = +gy)
     const pad = facingRoom(this.keypad.mesh);
     pad.position.copy(at(6.78, 7.3, 0.27)).setY(-7.3 * TILE_M - 0.004);
+    this.smartParts.push(pad);
     L.view.scene.add(this.hinge, pad);
     L.glow.addChild(this.breeze);
     L.fx.addChild(this.particles.g);
@@ -71,6 +74,8 @@ export class LockView extends DeviceView {
 
   protected draw(f: DeviceFrame) {
     const mode = f.attacked ? f.attack : 'normal';
+    // dveře má každý, chytrý zámek a klávesnici jen ten, kdo si je zapne
+    for (const o of this.smartParts) o.visible = this.smart;
     const target = mode === 'unlock' && !this.L.flags.has('doorHeld') ? OPEN : 0;
     const opening = target > this.angle + 0.01;
     if (opening && !this.wasOpening) audio.play('creak');

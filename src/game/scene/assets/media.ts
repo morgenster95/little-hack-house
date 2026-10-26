@@ -6,7 +6,7 @@ import { box, iso, isoHull, pts } from '../iso';
 import { P } from '../palette';
 import { zpx } from '../space';
 import { at } from '../three/props';
-import { glowMaterial } from '../three/toon';
+import { glowMaterial, toon } from '../three/toon';
 import { DeviceFrame, DeviceView, DeviceViewOptions, Layers } from './devices';
 
 /** Kužel světla obrazovky směrem ke gauči (televize je k divákovi zády). */
@@ -118,7 +118,8 @@ export class TvView extends DeviceView {
         const k = (f.t / 900 + i / 3) % 1;
         const x = src.x + (dst.x - src.x) * k;
         const y = src.y + (dst.y - src.y) * k;
-        w.arc(x, y, 8 + 6 * (1 - k), -0.9, 0.9).stroke({ width: 2.2, color: P.hack, alpha: 0.8 * Math.sin(k * Math.PI) });
+        const r = 8 + 6 * (1 - k);
+        w.moveTo(x + Math.cos(-0.9) * r, y + Math.sin(-0.9) * r).arc(x, y, r, -0.9, 0.9).stroke({ width: 2.2, color: P.hack, alpha: 0.8 * Math.sin(k * Math.PI) });
       }
       this.packetT -= f.dt;
       if (this.packetT <= 0) {
@@ -171,6 +172,8 @@ const LINES: Record<string, string[]> = {
 export class SpeakerView extends DeviceView {
   private ledRing: THREE.Mesh;
   private ringMat = glowMaterial(0x4d86ff);
+  private body: THREE.Mesh;
+  protected optional = true;
   private bubble = new SpeechBubble();
   private boxes = new Graphics();
   private line = -1;
@@ -182,13 +185,20 @@ export class SpeakerView extends DeviceView {
     super('speaker', L, [9.45, 5.75, zpx(1.05)], [9.25, 5.55, 9.65, 5.95], [isoHull(9.33, 5.63, zpx(0.46), 9.57, 5.87, zpx(0.7))], opts);
     this.ledRing = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.007, 10, 40), this.ringMat);
     this.ledRing.position.copy(at(SPEAKER.x, SPEAKER.y, SPEAKER.z));
-    L.view.scene.add(this.ledRing);
+    // reproduktor na skříňce u televize
+    this.body = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.06, 0.18, 32).rotateX(Math.PI / 2), toon(0x5b5f66));
+    this.body.position.copy(at(SPEAKER.x, SPEAKER.y, 0.48 + 0.09));
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.008, 32).rotateX(Math.PI / 2), toon(0x3a3e45));
+    top.position.set(0, 0, 0.094);
+    this.body.add(top);
+    L.view.scene.add(this.ledRing, this.body);
     L.fx.addChild(this.boxes, this.bubble.container);
   }
 
   protected draw(f: DeviceFrame) {
     const mode = f.attacked ? f.attack ?? 'normal' : 'normal';
-    this.ledRing.visible = this.smart;
+    // asistenta nemá každý – bez zapnutí ve scéně vůbec není
+    this.ledRing.visible = this.body.visible = this.smart;
     const talking = mode === 'order' || mode === 'creepy';
     const pulse = 0.55 + Math.sin(f.t / (talking ? 90 : 900)) * 0.45;
     const col = mode === 'creepy' ? 0xff2d55 : mode === 'order' ? P.hack : f.status === 'protected' ? P.protect : 0x4d86ff;

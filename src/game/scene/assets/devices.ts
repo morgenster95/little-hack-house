@@ -52,6 +52,9 @@ export abstract class DeviceView {
   private popT = -1;
   protected badgeAnchor: { x: number; y: number };
   private hits: Container[] = [];
+  /** Zařízení, které běžná domácnost mít nemusí – bez „chytré“ volby ve scéně vůbec není. */
+  protected optional = false;
+  private inited = false;
 
   constructor(
     public id: DeviceId,
@@ -64,6 +67,14 @@ export abstract class DeviceView {
     this.badgeAnchor = iso(...badgePos);
     this.badge.addChild(this.badgeG);
     this.badge.position.set(this.badgeAnchor.x, this.badgeAnchor.y);
+    // klepnutí na ikonu = klepnutí na zařízení
+    this.badge.eventMode = 'static';
+    this.badge.cursor = 'pointer';
+    this.badge.on('pointerover', () => (this.hover = true));
+    this.badge.on('pointerout', () => (this.hover = false));
+    this.badge.on('pointertap', () => {
+      if (this.opts.canTap()) this.opts.onTap(this.id);
+    });
     L.fx.addChild(this.badge);
     L.fx.addChild(this.shieldFx);
     L.glow.addChild(this.ring);
@@ -89,7 +100,12 @@ export abstract class DeviceView {
   }
 
   protected onSmartChange(smart: boolean) {
-    this.hits.forEach((n) => (n.cursor = smart ? 'pointer' : 'default'));
+    this.hits.forEach((n) => {
+      n.cursor = smart ? 'pointer' : 'default';
+      // skryté zařízení nejde ve scéně ani nahmatat
+      n.eventMode = smart || !this.optional ? 'static' : 'none';
+    });
+    if (!smart && this.optional) this.hover = false;
   }
 
   playBlocked(t: number) {
@@ -97,6 +113,10 @@ export abstract class DeviceView {
   }
 
   frame(f: DeviceFrame) {
+    if (!this.inited) {
+      this.inited = true;
+      this.onSmartChange(f.smart);
+    }
     if (f.smart !== this.smart) {
       this.smart = f.smart;
       this.popT = f.t;
@@ -145,12 +165,16 @@ export abstract class DeviceView {
       g.moveTo(-2.4, 0).lineTo(-0.6, 2).lineTo(2.8, -2.2).stroke({ width: 1.6, color: P.protect, cap: 'round' });
     } else if (st === 'recovering') {
       const a = f.t / 150;
-      g.arc(0, 0, 5.5, a, a + 4.2).stroke({ width: 2.2, color: ink, cap: 'round' });
+      g.moveTo(Math.cos(a) * 5.5, Math.sin(a) * 5.5).arc(0, 0, 5.5, a, a + 4.2).stroke({ width: 2.2, color: ink, cap: 'round' });
     } else {
-      // wifi
+      // wifi – každý oblouk začíná vlastním moveTo, jinak by ho Pixi spojil čarou s předchozím tvarem
       g.circle(0, 4, 1.8).fill(ink);
-      g.arc(0, 4, 5, -Math.PI * 0.78, -Math.PI * 0.22).stroke({ width: 1.8, color: ink, cap: 'round' });
-      g.arc(0, 4, 8.5, -Math.PI * 0.75, -Math.PI * 0.25).stroke({ width: 1.8, color: ink, cap: 'round' });
+      for (const [r, a0, a1] of [
+        [5, -Math.PI * 0.78, -Math.PI * 0.22],
+        [8.5, -Math.PI * 0.75, -Math.PI * 0.25],
+      ]) {
+        g.moveTo(Math.cos(a0) * r, 4 + Math.sin(a0) * r).arc(0, 4, r, a0, a1).stroke({ width: 1.8, color: ink, cap: 'round' });
+      }
     }
   }
 
